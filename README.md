@@ -5,7 +5,7 @@ Contains code to analyze transcriptomic data from Allen Human Brain Data
 
 ### Cloning this Repository
 
-1. Copy the git repo URL. Click the "Clone or Download" button and copy the link (`https://github.com/maedbhk/cerebellum_learning_run.git`).
+1. Copy the git repo URL. Click the "Clone or Download" button and copy the link (`https://github.com/maedbhk/cerebellum_transcriptomics.git`).
 2. Go to your terminal and navigate (using `cd` and `ls` commands) to the directory where you want to clone the repository. 
 3. Use `git clone` to download the entire folder to your computer:
 ```

@@ -800,7 +800,7 @@ def _reorder_dendrogram_leaves(dataframe):
     
     return dataframe[cols_reorder]
 
-def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, orientation='top', color_leaves=False, ax=None, **kwargs):
+def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, orientation='top', color_leaves=True, ax=None, **kwargs):
     """ Plots dendrogram plot.
         
         Args:
@@ -821,7 +821,7 @@ def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, 
         dataframe = _reorder_dendrogram_leaves(dataframe)
 
     if color_leaves:
-        set_link_color_palette(['m', 'y', 'y', 'y'])
+        set_link_color_palette(['r', 'b', 'y', 'y'])
     else:
         set_link_color_palette(['k', 'k', 'k', 'k'])
 
@@ -910,7 +910,7 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
     ax = sns.heatmap(
         corr_matrix, 
         vmin=-1, vmax=1, center=0,
-        cmap=sns.diverging_palette(20, 220, n=200),
+        # cmap=sns.cubehelix_palette(8),
         square=True, 
         ax=ax, 
         linewidths=.5,

@@ -74,7 +74,7 @@ def fig_methods(atlas='SUIT-10', which_genes='top', percentile=1, remove_outlier
 
     # 1b
     ax2 = fig.add_subplot(gs[0, 1])
-    visualize.sample_counts_roi(df, ax=ax2, atlas='SUIT-10')
+    visualize.sample_counts_roi(df, ax=ax2, atlas=atlas)
     ax2.tick_params(axis='x', which='major', labelsize=15)
     ax2.tick_params(axis='y', which='major', labelsize=20)
     ax2.text(x_pos, y_pos, 'B', transform=ax2.transAxes, fontsize=40,
@@ -299,7 +299,7 @@ def fig_3(atlas1='MDTB-10-subRegions', atlas2='SUIT-10', which_genes='top', perc
     
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "fig_3"), bbox_inches="tight", dpi=300)
 
-def fig_4(atlas_cerebellum='Buckner-17', atlas_cortex='Yeo-17', atlas_other='SUIT-10',which_genes='top', percentile=1, remove_outliers=True, **kwargs):
+def fig_4(atlas_cerebellum='Buckner-7', atlas_cortex='Yeo-7', atlas_other='SUIT-10',which_genes='top', percentile=1, remove_outliers=True, **kwargs):
     """This function plots figure 4. 
     Panel A: Parcellations - Yeo-7 and Buckner-7.
     Panel B: Correlation matrix for Buckner and Yeo regions. 
@@ -392,7 +392,7 @@ def supp_1(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=Tru
             c = i - 3
 
         ax1 = fig.add_subplot(gs[r, c])
-        visualize.sample_counts_roi(df, ax=ax1, atlas="SUIT-10")
+        visualize.sample_counts_roi(df, ax=ax1, atlas=atlas)
         ax1.tick_params(axis='x', which='major', labelsize=10)
         ax1.tick_params(axis='y', which='major', labelsize=20)
         ax1.set_title(str(df["donor_id"].unique()[0]))
@@ -441,7 +441,7 @@ def supp_2(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=Tru
         if i==0:
             ax2.text(x_pos, y_pos, 'B', transform=ax2.transAxes, fontsize=40,
             verticalalignment='top')
-        visualize.pcs_loading_plot(df, num_pcs=1, group_pcs=False, ax=ax2, atlas='SUIT-10')
+        visualize.pcs_loading_plot(df, num_pcs=1, group_pcs=False, ax=ax2, atlas=atlas)
         ax2.tick_params(axis='x', which='major', labelsize=10)
 
         ax3 = fig.add_subplot(gs[i, 2])

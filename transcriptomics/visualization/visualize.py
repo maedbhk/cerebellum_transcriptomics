@@ -80,25 +80,32 @@ def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, **kwarg
     # plt.title("Differential Stability")
 
 def _reorder_colors_x_axis(dataframe, cpal):
+    """
+    reorder the colors along the x axis when regions are missing
+    atlas labels need to be in the format "R01" to work
+    """
     try:
         labels = sorted(dataframe['region_id'].unique())
     except:
         labels = dataframe.columns
 
-    regex = r"(\d+)-(\w+)"
+    regex = r"(\d+)-?(\w+)?"
 
-    # get atlas labels
-    groups = []
-    for p in labels:
-        match = re.findall(regex, p)[0]
-        groups.append(match)
+    try:
+        # get atlas labels
+        groups = []
+        for p in labels:
+            match = re.findall(regex, p)[0]
+            groups.append(match)
+    except:
+        print('atlas labels are not in the correct format, example format is R01 or R01-<any char>')
 
     index = []
     for group in groups:
         if group[1]=='A':
             index.append(int(group[0])-1)
         elif group[1]=='P':
-            index.append(int(group[0]) + 9)
+            index.append(int(group[0]) + int(len(cpal)/ 2) - 1)
         else:
             index.append(int(group[0])-1)
             
@@ -166,7 +173,16 @@ def sample_counts_donor_mean(dataframe, ax=None, **kwargs):
     """
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
-    ax = sns.violinplot(x="donor_id", y="sample_counts", data=dataframe, palette="Set2", scale="count", ax=ax, **kwargs) #  bw=.2, inner="stick"
+
+    # colors for barplot (seems like a lot of hassle to make plot colors ...)
+    labels = Defaults.donors
+    colors_rgb = Defaults.donor_colors # given as rgb between 0 and 1
+    cmap_name = "donors"
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors_rgb, N=len(colors_rgb))
+    mpl.cm.register_cmap("mycolormap", cmap)
+    cpal = sns.color_palette("mycolormap", n_colors=len(labels))
+
+    ax = sns.violinplot(x="donor_id", y="sample_counts", data=dataframe, palette=cpal, scale="count", ax=ax, **kwargs) #  bw=.2, inner="stick"
     ax.set_ylabel('Sample Count')
     ax.set_xlabel('')
 
@@ -181,10 +197,19 @@ def sample_counts_donor_sum(dataframe, ax=None, **kwargs):
     """
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
+
+    # colors for barplot (seems like a lot of hassle to make plot colors ...)
+    labels = Defaults.donors
+    colors_rgb = Defaults.donor_colors # given as rgb between 0 and 1
+    cmap_name = "donors"
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors_rgb, N=len(colors_rgb))
+    mpl.cm.register_cmap("mycolormap", cmap)
+    cpal = sns.color_palette("mycolormap", n_colors=len(labels))
+
     sample_total = dataframe.groupby('donor_id').sum()['sample_counts']
     x = sample_total.index
     y = sample_total.values
-    ax = sns.barplot(x, y, palette="Set2", ax=ax, **kwargs)
+    ax = sns.barplot(x, y, ax=ax, palette=cpal, **kwargs)
     ax.set_ylabel('Sample Count')
     ax.set_xlabel('')
 
@@ -242,7 +267,7 @@ def _make_colorpalette(atlas):
     return cpal
 
 def _make_colorbar(atlas, ax=None):
-    """ Helper function to make a matplotlib colorbar. Color info csv file must have been created.
+    """ Helper function to make a matplotlib colorbar - specifically for atlas. Color info csv file must have been created.
         
         Args:
             atlas (str): the name of the atlas to use
@@ -271,6 +296,38 @@ def _make_colorbar(atlas, ax=None):
 
     else:
         print('atlas info csv file does not exist')
+
+def _make_colorbar_donor(ax=None):
+    """ Helper function to make a matplotlib colorbar - specifically for donor.
+        Donor names and colors are given in constants.py
+        
+        Args:
+            atlas (str): the name of the atlas to use
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(1, 10))
+
+    labels = Defaults.donors
+    colors_rgb = Defaults.donor_colors # given as rgb between 0 and 1
+
+    cmap_name = "donors"
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors_rgb, N=len(colors_rgb))
+
+    bounds = np.arange(cmap.N + 1)
+
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    cb3 = mpl.colorbar.ColorbarBase(ax, cmap=cmap.reversed(cmap), 
+                                    norm=norm,
+                                    ticks=bounds,
+                                    format='%s',
+                                    orientation='vertical',
+                                    )
+    cb3.set_ticklabels(labels[::-1])  
+    cb3.ax.tick_params(size=0)
+    cb3.set_ticks(bounds+.5)
+    cb3.ax.tick_params(axis='y', which='major', labelsize=30)
+
+    plt.savefig(str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{cmap_name}-colorbar.png"), bbox_inches='tight')
 
 def _get_colors_transcriptomic_atlas(dataframe):
     
@@ -911,6 +968,7 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
         corr_matrix, 
         vmin=-1, vmax=1, center=0,
         # cmap=sns.cubehelix_palette(8),
+        cmap=sns.diverging_palette(220, 20, sep=20, as_cmap=True),
         square=True, 
         ax=ax, 
         linewidths=.5,

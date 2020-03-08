@@ -198,7 +198,7 @@ def fig_2(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
 
     # 2b
     ax2 = fig.add_subplot(gs[0, 1])
-    visualize.dendrogram_plot(df.T, ax=ax2)
+    visualize.dendrogram_plot(df.T, ax=ax2, color_leaves=False)
     ax2.tick_params(axis='x', which='major', labelsize=15)
     ax2.tick_params(axis='y', which='major', labelsize=20)
     plt.setp(ax2.lines, linewidth=10) # THIS ISN'T WORKING
@@ -401,7 +401,7 @@ def supp_1(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=Tru
 
         plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_1"), bbox_inches="tight", dpi=300)
 
-def supp_2(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True, **kwargs):
+def supp_2(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True, **kwargs): 
     """This function plots supp 2. 
     Panel A. Individual dendrogram and pc loading plots and sample roi counts.
 

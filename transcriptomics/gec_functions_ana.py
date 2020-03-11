@@ -5,7 +5,7 @@ import numpy as np
 import scipy as sp
 import pandas as pd
 
-import matplotlib as mpl
+import matplotlib as mpla
 from matplotlib import cm
 from matplotlib import pyplot as plt
 import seaborn as sns

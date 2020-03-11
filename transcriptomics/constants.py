@@ -17,8 +17,7 @@ class Defaults:
 
     # list of donor ids
     donors = ['donor9861', 'donor10021', 'donor12876', 'donor14380', 'donor15496', 'donor15697']
-    donor_colors = [[0, 0, 1], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 1, 1], [1, 0, 1]] # blue, red, green, yellow, cyan, magenta 
-    # CHECK THAT THIS COLOR ORDER IS CORRECT!!!
+    donor_colors = [[0, 0, 1], [1, 1, 0], [0, 1, 0], [1, 0, 0], [0, 1, 1], [1, 0, 1]] # blue, yellow, green, red, cyan, magenta
 
     parcellations = ['SUIT-10', 'Buckner-7', 'Buckner-17', 'MDTB-10', 'Yeo-7', 'Yeo-17', 'MDTB-10-subRegions', 'Ji-10', 'Desikan-Killiany-83', 'SUIT-26']
                     # 'NNMF_dim2_group1', 'NNMF_dim2_group2','NNMF_dim3_group1', 'NNMF_dim3_group2','NNMF_dim4_group1', 

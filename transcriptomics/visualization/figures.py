@@ -122,6 +122,7 @@ def fig_1(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
         kwargs["remove_outliers"] = remove_outliers
 
     fig = plt.figure()
+    # fig = plt.figure(figsize=(35,25))
     gs = GridSpec(1, 2, figure=fig)
 
     x_pos = -0.2
@@ -538,6 +539,7 @@ def supp_4(atlas_cerebellum="Buckner-7", atlas_cortex="Yeo-7", which_genes='top'
         visualize.sample_counts_roi(df_thresh, ax=ax1, atlas=atlas_cerebellum)
         ax1.tick_params(axis='x', which='major', labelsize=13)
         ax1.tick_params(axis='y', which='major', labelsize=20)
+        ax1.set_title(str(df_thresh["donor_id"].unique()[0]))
 
         ax2 = fig.add_subplot(gs[i, 1]) 
         df_thresh = ana.return_thresholded_data(atlas=atlas_cortex, which_genes=which_genes, percentile=percentile, atlas_other="SUIT-10", donor_num=i+1, **kwargs)

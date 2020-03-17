@@ -213,16 +213,16 @@ def sample_counts_donor_sum(dataframe, ax=None, **kwargs):
     ax.set_ylabel('Sample Count')
     ax.set_xlabel('')
 
-def png_plot(atlas, ax=None):
-    """ Plots a png image of an atlas from the "atlas_templates" folder.
+def png_plot(filename, ax=None):
+    """ Plots a png image from the "atlas_templates" folder.
         
         Args:
-            atlas (str): the name of the atlas to use
+            filename (str): the name of the image to plot
             ax (bool): figure axes. Default is None
     """
-    filename = str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{atlas}.png")
-    if os.path.isfile(filename):
-        img = mpimg.imread(filename)
+    fpath = str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{filename}.png")
+    if os.path.isfile(fpath):
+        img = mpimg.imread(fpath)
     else:
         print("image does not exist. run concat_png to create desired image")
 
@@ -985,7 +985,6 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
     # ax.title('Correlation Matrix', fontsize=20)
 
 def raster_plot(dataframe, ax=None, gene_reorder=True, cbar=True, **kwargs):
-    
     if ax is None:
         plt.figure(num=1, figsize=[25,15])
 

@@ -31,7 +31,7 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, normalize=True, 
                 donor_num (int): any one of the 6 donors 
                 remove_outliers (bool): certain atlases have outliers that should be removed (i.e. SUIT-10)
                 reorder_labels (bool): certain atlases have labels that need to be reordered for visual presentation (i.e. MDTB-10-subRegions)
-                unthresholded (bool): returns grouped data for unthresholded data
+                unthresholded (bool): returns grouped data for unthresholded data.
     """
     # option to get genes from another atlas
     if kwargs.get("atlas_other"):
@@ -187,7 +187,7 @@ def _remove_outliers(dataframe, atlas, **kwargs):
     return dataframe
 
 def _reorder_labels(dataframe, atlas):
-    if atlas=="MDTB-10-subregions":
+    if atlas=="MDTB-10-subRegions":
         regex = re.compile(r"(-)(\w+)")
 
         order = []

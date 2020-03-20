@@ -200,6 +200,33 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
 
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "fig_3"), bbox_inches="tight", dpi=300)
 
+def fig_4_new():
+    # fig = plt.figure(figsize=(15,15))
+    fig = plt.figure()
+    gs = GridSpec(1, 2, figure=fig)
+
+    x_pos = -0.2
+    y_pos = 1.02 
+
+    # 4a
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1.text(x_pos, 1.0, 'A', transform=ax1.transAxes, fontsize=40,
+    verticalalignment='top')
+    visualize.png_plot(filename="rat_zones", ax=ax1)
+    ax1.axis('off')
+
+    # 4b
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.text(x_pos, 1.0, 'B', transform=ax2.transAxes, fontsize=40,
+    verticalalignment='top')
+    visualize.png_plot(filename="transcriptomic_parcellation", ax=ax2)
+    ax2.axis('off')
+
+    plt.subplots_adjust(left=0.02, bottom=0.001, right=2.0, top=1.0, wspace=.2, hspace=.3)
+
+    plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "fig_4"), bbox_inches="tight", dpi=300)
+
+
 def supp_1_new(atlas_anat="SUIT-10", atlas_cerebellum_task="MDTB-10-subRegions", atlas_cerebellum_rs="Buckner-7", atlas_cortex_rs="Yeo-7", which_genes='top', percentile=1, remove_outliers=True, atlas_other="MDTB-10"):
     # fig = plt.figure()
     fig = plt.figure(figsize=(15,15))
@@ -352,7 +379,6 @@ def supp_4_new(atlas="SUIT-26", which_genes='top', percentile=1, remove_outliers
     visualize.simple_corr_heatmap(dataframe, ax=ax1)
 
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_4"), bbox_inches="tight", dpi=300)
-
 
 def fig_methods(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True, **kwargs):
     """This function plots figure 1. This is a descriptive figure so it 

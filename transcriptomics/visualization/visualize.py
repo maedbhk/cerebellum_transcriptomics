@@ -878,7 +878,7 @@ def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, 
         dataframe = _reorder_dendrogram_leaves(dataframe)
 
     if color_leaves:
-        set_link_color_palette(['m', 'y', 'y', 'y'])
+        set_link_color_palette(['r', 'b', 'y', 'm'])
     else:
         set_link_color_palette(['k', 'k', 'k', 'k'])
 

@@ -78,6 +78,7 @@ def fig_1_new(atlas='MDTB-10', which_genes='top', percentile=1, remove_outliers=
     ax4.text(x_pos, y_pos, 'D', transform=ax4.transAxes, fontsize=40,
         verticalalignment='top')
     ax4.yaxis.label.set_size(30)
+    ax4.xaxis.label.set_size(30)
 
     plt.subplots_adjust(left=0.125, bottom=0.001, right=2.0, top=2.0, wspace=.2, hspace=.3)
 
@@ -85,49 +86,66 @@ def fig_1_new(atlas='MDTB-10', which_genes='top', percentile=1, remove_outliers=
     
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "fig_1"), bbox_inches="tight", dpi=300)
 
-def fig_2_new(which_genes='top', percentile=1, remove_outliers=True, atlas_other="MDTB-10"):
-    fig = plt.figure(figsize=(15, 15))
+def fig_2_new(which_genes='top', percentile=1, remove_outliers=True, reorder_labels=True, atlas_other="MDTB-10"):
+    fig = plt.figure(figsize=(15, 20))
     # fig = plt.figure()
-    gs = GridSpec(2, 2, figure=fig)
+    gs = GridSpec(3, 3, figure=fig)
 
     x_pos = -0.2
     y_pos = 1.02
 
     # 2a
-    ax1 = fig.add_subplot(gs[0, 0])
+    ax1 = fig.add_subplot(gs[0, 1])
     visualize.png_plot(filename='MDTB-10-subRegions', ax=ax1)
     ax1.axis('off')
-    ax1.text(x_pos, y_pos, 'A', transform=ax1.transAxes, fontsize=40,
+    ax1.text(x_pos-0.02, y_pos, 'A', transform=ax1.transAxes, fontsize=40,
     verticalalignment='top')
     ax1.yaxis.label.set_size(30)
 
     # 2b
-    df = ana.return_grouped_data(atlas='MDTB-10-subRegions', which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers)
-    ax2 = fig.add_subplot(gs[0, 1])
+    df = ana.return_grouped_data(atlas='MDTB-10-subRegions', which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers)
+    ax2 = fig.add_subplot(gs[1, 1])
     visualize.dendrogram_plot(df.T, ax=ax2, color_leaves=True)
-    ax2.tick_params(axis='x', which='major', labelsize=15)
+    ax2.tick_params(axis='x', which='major', labelsize=10)
     ax2.tick_params(axis='y', which='major', labelsize=20)
     ax2.text(x_pos, y_pos, 'B', transform=ax2.transAxes, fontsize=40,
     verticalalignment='top')
     ax2.yaxis.label.set_size(30)
 
     # 2c
-    df = ana.return_concatenated_data(atlas_cerebellum="Buckner-7", atlas_cortex="Yeo-7", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers)
-    ax3 = fig.add_subplot(gs[1, 0])
-    visualize.png_plot(filename="Yeo-7", ax=ax3)
-    ax3.axis('off')
-    ax3.text(-0.35, y_pos, 'C', transform=ax3.transAxes, fontsize=40,
+    ax3 = fig.add_subplot(gs[2, 0:2])
+    visualize.simple_corr_heatmap(df, ax=ax3)
+    ax3.tick_params(axis='x', which='major', labelsize=15)
+    ax3.tick_params(axis='y', which='major', labelsize=15)
+    ax3.text(x_pos-.03, y_pos, 'C', transform=ax3.transAxes, fontsize=40,
     verticalalignment='top')
     ax3.yaxis.label.set_size(30)
-    
-    # 2d
-    ax4 = fig.add_subplot(gs[1, 1])
-    visualize.simple_corr_heatmap(df, ax=ax4)
-    ax4.tick_params(axis='x', which='major', labelsize=20)
-    ax4.tick_params(axis='y', which='major', labelsize=20)
-    ax4.text(-1.05, y_pos, 'D', transform=ax4.transAxes, fontsize=40,
+
+   # 2d
+    ax4 = fig.add_subplot(gs[0, 2])
+    visualize.png_plot(filename="Yeo-7-v1", ax=ax4)
+    ax4.axis('off')
+    ax4.text(x_pos+.15, y_pos+.4, 'D', transform=ax4.transAxes, fontsize=40,
     verticalalignment='top')
     ax4.yaxis.label.set_size(30)
+
+    # 2e
+    ax5 = fig.add_subplot(gs[1, 2])
+    visualize.png_plot(filename="Buckner-7-v1", ax=ax5)
+    ax5.axis('off')
+    # ax5.text(x_pos+.1, y_pos, 'E', transform=ax5.transAxes, fontsize=40,
+    # verticalalignment='top')
+    ax5.yaxis.label.set_size(30)
+
+    # 2f
+    df = ana.return_concatenated_data(atlas_cerebellum="Buckner-7", atlas_cortex="Yeo-7", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers)
+    ax6 = fig.add_subplot(gs[2, 2])
+    visualize.simple_corr_heatmap(df, ax=ax6)
+    ax6.tick_params(axis='x', which='major', labelsize=20)
+    ax6.tick_params(axis='y', which='major', labelsize=20)
+    ax6.text(x_pos-.16, y_pos, 'E', transform=ax6.transAxes, fontsize=40,
+    verticalalignment='top')
+    ax6.yaxis.label.set_size(30)
 
     plt.subplots_adjust(left=0.02, bottom=0.001, right=2.0, top=1.0, wspace=.2, hspace=.3)
 
@@ -147,7 +165,7 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
     visualize.dendrogram_plot(df, orientation='left', color_leaves=False, ax=ax1)
     ax1.tick_params(axis='x', which='major', labelbottom=False, bottom=False, top=False)
     ax1.axis('off')
-    ax1.text(x_pos, y_pos, 'A', transform=ax1.transAxes, fontsize=30,
+    ax1.text(x_pos, y_pos, 'B', transform=ax1.transAxes, fontsize=30,
     verticalalignment='top')
     ax1.yaxis.label.set_size(30)
 
@@ -156,7 +174,7 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers)
     visualize.raster_plot(df,  ax=ax2)
     ax2.tick_params(axis='both', which='major', labelsize=20)
-    ax2.text(x_pos, y_pos, 'B', transform=ax2.transAxes, fontsize=30,
+    ax2.text(x_pos, y_pos, 'C', transform=ax2.transAxes, fontsize=30,
     verticalalignment='top')
     ax2.yaxis.label.set_size(30)
 
@@ -165,7 +183,7 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
     ax3 = fig.add_subplot(gs[0:2, 1:5])
     visualize.simple_corr_heatmap(df, ax=ax3)
     ax3.tick_params(axis='both', which='major', labelsize=20)
-    ax3.text(-0.4, 1.06, 'C', transform=ax3.transAxes, fontsize=30,
+    ax3.text(-0.4, 1.06, 'D', transform=ax3.transAxes, fontsize=30,
     verticalalignment='top')
     ax3.yaxis.label.set_size(30)
 
@@ -175,7 +193,7 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
     ax4.tick_params(axis='x', which='major', labelsize=10)
     ax4.tick_params(axis='y', which='major', labelsize=20)
     plt.setp(ax4.lines, linewidth=10) # THIS ISN'T WORKING
-    ax4.text(-0.28, 1.09, 'D', transform=ax4.transAxes, fontsize=30,
+    ax4.text(-0.28, 1.09, 'E', transform=ax4.transAxes, fontsize=30,
     verticalalignment='top')
     ax4.yaxis.label.set_size(20)
 
@@ -186,7 +204,7 @@ def fig_3_new(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=
     visualize.pcs_loading_plot(df, num_pcs=0, group_pcs=False, atlas=atlas, ax=ax5)
     ax5.tick_params(axis='x', which='major', labelsize=10)
     ax5.tick_params(axis='y', which='major', labelsize=20)
-    ax5.text(-0.28, 1.04, 'E', transform=ax5.transAxes, fontsize=30,
+    ax5.text(-0.28, 1.04, 'F', transform=ax5.transAxes, fontsize=30,
     verticalalignment='top')
     ax5.yaxis.label.set_size(20)
 
@@ -217,9 +235,9 @@ def fig_4_new():
 
     # 4b
     ax2 = fig.add_subplot(gs[0, 1])
-    ax2.text(x_pos, 1.0, 'B', transform=ax2.transAxes, fontsize=40,
+    ax2.text(x_pos, 1.077, 'B', transform=ax2.transAxes, fontsize=40,
     verticalalignment='top')
-    visualize.png_plot(filename="transcriptomic_parcellation", ax=ax2)
+    visualize.png_plot(filename="MDTB-10-subRegions-transcriptomic", ax=ax2)
     ax2.axis('off')
 
     plt.subplots_adjust(left=0.02, bottom=0.001, right=2.0, top=1.0, wspace=.2, hspace=.3)

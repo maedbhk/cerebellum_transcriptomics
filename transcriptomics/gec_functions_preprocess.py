@@ -7,10 +7,10 @@ import os
 import re 
 import glob
 from collections import namedtuple
+import seaborn as sns
 
 import abagen # library for preprocessing AHBA data
 from sklearn.utils import Bunch
-from nilearn import image, datasets
 import nibabel as nib
 
 import pandas as pd
@@ -39,6 +39,9 @@ class Parameters:
     agg_metric = 'mean'
     donors = 'all'
     data_dir = Defaults.RAW_DATA_DIR
+    verbose = 1
+    n_proc = 1
+    return_samples = True # I added in this parameter to return an unaggregated dataframe (labelled samples x genes)
 
 def get_all_files():
     """ This downloads all files from AHBA. 
@@ -69,11 +72,20 @@ def save_expression_data(atlas):
         probe_selection=Parameters.probe_selection, lr_mirror=Parameters.lr_mirror, gene_norm=Parameters.gene_norm,
         sample_norm=Parameters.sample_norm, corrected_mni=Parameters.corrected_mni, reannotated=Parameters.reannotated,
         return_counts=Parameters.return_counts, return_donors=Parameters.return_donors, region_agg=Parameters.region_agg,
-        agg_metric=Parameters.agg_metric, donors=Parameters.donors, data_dir=Parameters.data_dir)
+        agg_metric=Parameters.agg_metric, donors=Parameters.donors, data_dir=Parameters.data_dir, 
+        verbose=Parameters.verbose, n_proc=Parameters.n_proc, return_samples=Parameters.return_samples)
+
+    # what expression dataframe is being saved out. aggregate or all samples?
+    if Parameters.return_samples:
+        out_name = f"expression-alldonors-{atlas}-samples.csv"
+    else:
+        out_name = f"expression-alldonors-{atlas}-cleaned.csv"
 
     # get expression data
     df_concat = pd.DataFrame()
     for i, df in enumerate(dataframes):
+
+        df = df.reset_index()
         
         # add atlas info to expression data
         df_merge = atlas_info.merge(df, left_on='region_num', right_on='label')
@@ -81,13 +93,18 @@ def save_expression_data(atlas):
         # add some new columns
         df_merge['donor_id'] = Defaults.donors[i]
         df_merge['donor_num'] = i+1
-        df_merge['sample_counts'] = counts[i].to_list()
+
+        # return sample counts if returning aggregate dataframe
+        if Parameters.return_samples:
+            pass
+        else:
+            df_merge['sample_counts'] = counts[i].to_list()
         
         # concat dataframes and drop nan values
         df_concat = pd.concat([df_concat, df_merge]).dropna()
 
     # write out expression data to file for all donors
-    output_dir = Defaults.INTERIM_DIR / f"expression-alldonors-{atlas}-cleaned.csv"
+    output_dir = Defaults.INTERIM_DIR / out_name
     df_concat.to_csv(output_dir, index=None, header=True)  
 
 def save_atlas_info(atlas):
@@ -115,8 +132,10 @@ def save_thresholded_data(atlas, which_genes='top', percentile=1):
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1
     """
-    # load in cleaned data 
+    
+    # load in cleaned data (aggregated across samples)
     expression_cleaned = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
+    out_name = f"expression-alldonors-{atlas}-{which_genes}-{percentile}.csv"
 
     # return differential stability results based on two groups (donors 1-3; donors 4-6)
     ds = _get_differential_stability(atlas) # this function assumes that you're providing all 6 donors
@@ -130,7 +149,7 @@ def save_thresholded_data(atlas, which_genes='top', percentile=1):
     # expression_thresholded["threshold"] = threshold
     
     # save out thresholded dataframe
-    expression_thresholded.to_csv(Defaults.PROCESSED_DIR / f"expression-alldonors-{atlas}-{which_genes}-{percentile}.csv", index=None, header=True)
+    expression_thresholded.to_csv(Defaults.PROCESSED_DIR / out_name, index=None, header=True)
 
 def resample_to_mni(atlas): 
     """ This function resamples atlas into mni space and overwrites original atlas.
@@ -155,16 +174,25 @@ def resample_to_mni(atlas):
 
 def save_mni_coords():
     file_dir = Defaults.RAW_DATA_DIR / "allenbrain"
-    donor_files = file_dir / '*'
     regex = r"(donor\d+)"
 
+    colors = Defaults.donor_colors
+    
+    # get fpath to donor folders
+    donor_files = []
+    for donor in Defaults.donors:
+        donor_files.append(os.path.join(file_dir, f'normalized_microarray_{donor}'))
+
     df_all = pd.DataFrame()
-    for i, donor_file in enumerate(glob.glob(str(donor_files))):
+    for i, donor_file in enumerate(donor_files):
         os.chdir(donor_file)
         df = pd.read_csv("SampleAnnot.csv")
         df = df.query('slab_type=="CB"')[['structure_acronym', 'mni_x', 'mni_y', 'mni_z']]
         df['donor_id'] = re.findall(regex, donor_file)[0]
         df['donor_num'] = i+1
+        df['r'] = colors[i][0]
+        df['g'] = colors[i][1]
+        df['b'] = colors[i][2]
         df_all = pd.concat([df_all, df])
 
     df_all.to_csv(Defaults.RAW_DATA_DIR / "mni_coords_all_donors.csv") 
@@ -188,10 +216,18 @@ def _get_atlas_info(atlas):
 
    # get num of rois
     n_roi = len(labels_roi)
-    # intialise dict
-    # info = {'id':list(range(1,n_roi+1)), 'label': labels_roi, 'hemisphere': ['none']*n_roi, 'colours': colours, 'structure':['cerebellum']*n_roi}
 
-    info = {'region_num':list(range(1,n_roi+1)), 'region_id': labels_roi, 'colours': colours}
+    color_r = []
+    color_g = []
+    color_b = []
+    for i in np.arange(len(colours)):
+        color_r.append(colours[i][0])
+        color_g.append(colours[i][1])
+        color_b.append(colours[i][2])
+    
+    # intialise dict
+    # info = {'region_num':list(range(1,n_roi+1)), 'region_id': labels_roi, 'colours': colours}
+    info = {'region_num':list(range(1,n_roi+1)), 'region_id': labels_roi, 'r': color_r, 'g': color_g, 'b': color_b}
 
     # create dataframe
     info_dataframe = pd.DataFrame(info) 

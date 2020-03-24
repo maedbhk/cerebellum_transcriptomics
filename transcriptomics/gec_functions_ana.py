@@ -17,16 +17,17 @@ from transcriptomics.visualization import visualize
 
 GeneSubset = namedtuple("GeneSubset", ["threshold", "goi_idx"])
 
-def return_grouped_data(atlas, which_genes='top', percentile=1, normalize=True, **kwargs):
+def return_grouped_data(atlas, which_genes='top', percentile=1, **kwargs):
     """This function returns grouped and thresholded data for a specified atlas.
 
     Args:
         atlas (str): the name of the atlas to use
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1 
-        normalize (bool): whether or not to normalize (center and scale) the data
+        
         kwargs (dict): dictionary of additional (optional) kwargs.
             may include any of the following:
+                normalize (bool): whether or not to normalize (center and scale) the data
                 atlas_other (str): returns thresholded data using genes from another atlas
                 donor_num (int): any one of the 6 donors 
                 remove_outliers (bool): certain atlases have outliers that should be removed (i.e. SUIT-10)
@@ -56,7 +57,7 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, normalize=True, 
     dataframe = _group_by_region(dataframe)
 
     # option to center and scale
-    if normalize:
+    if kwargs.get("normalize"):
         dataframe = _center_scale(dataframe.T)
     else:
         dataframe = dataframe.T
@@ -70,7 +71,9 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, normalize=True, 
     # df = do_something(df, **kwargs)
 
 def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
-    """This function returns thresholded data for a specified atlas.
+    """This function returns thresholded data for a specified atlas. 
+       By default, returns the aggregate data (across regions) but there's also an option
+       to return all samples
 
     Args:
         atlas (str): the name of the atlas to use
@@ -81,8 +84,15 @@ def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
                 normalize (bool): whether or not to normalize (center and scale) the data
                 remove_outliers (bool): removes outliers from certain atlases
                 donor_num (int): any one of the 6 donors
+                all_samples (bool): returns aggregate samples (across regions) or all samples
     """
-    dataframe = pd.read_csv(Defaults.PROCESSED_DIR / f'expression-alldonors-{atlas}-{which_genes}-{percentile}.csv') 
+    
+    dataframe = _threshold_data(atlas, which_genes, percentile, **kwargs)
+
+    if kwargs.get("atlas_other"):
+        genes = _get_gene_symbols(kwargs["atlas_other"], which_genes, percentile)
+    else:
+        genes = _get_gene_symbols(atlas, which_genes, percentile)
     
     if kwargs.get("remove_outliers"):
         dataframe = _remove_outliers(dataframe, atlas, **kwargs)
@@ -93,18 +103,26 @@ def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
         dataframe = dataframe.query(f'donor_num=={donor_num}')
 
     if kwargs.get("normalize"):
-        cols = _get_gene_symbols(atlas, which_genes, percentile)
-        dataframe[cols] = _center_scale(dataframe[cols])
+        dataframe[genes] = _center_scale(dataframe[genes])
 
     return dataframe
 
-def return_unthresholded_data(atlas):
+def return_unthresholded_data(atlas, **kwargs):
     """This function returns unthresholded data for a specified atlas.
 
     Args:
         atlas (str): the name of the atlas to use
+
+        kwargs (dict): dictionary of additional (optional) kwargs.
+            may include any of the following:
+                all_samples (bool): option to return dataframe with all samples or aggregated across regions
     """
-    return pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
+    if kwargs.get("all_samples"):
+        out_name = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-samples.csv') 
+    else:
+        out_name = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
+
+    return out_name
 
 def return_concatenated_data(atlas_cerebellum, atlas_cortex, which_genes='top', percentile=1, normalize=True, **kwargs):
     """This function returns concatenated dataframe for grouped and thresholded cortical and cerebellar data.
@@ -222,6 +240,7 @@ def _get_gene_symbols(atlas, which_genes, percentile):
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1 
     """
+
     dataframe = pd.read_csv(Defaults.PROCESSED_DIR / f'expression-alldonors-{atlas}-{which_genes}-{percentile}.csv')
 
     # use regex to find gene columns
@@ -229,7 +248,7 @@ def _get_gene_symbols(atlas, which_genes, percentile):
 
     return gene_symbols
 
-def _threshold_data(atlas, which_genes, percentile, atlas_other):
+def _threshold_data(atlas, which_genes, percentile, **kwargs):
     """This function returns thresholded data for a specified atlas
     using a subset of genes from another atlas
 
@@ -237,12 +256,19 @@ def _threshold_data(atlas, which_genes, percentile, atlas_other):
         atlas (str): the name of the atlas to return
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1 
-        atlas_other (str): the name of the atlas that will be used for gene
-        extraction
+        kwargs (dict): dictionary of additional (optional) kwargs.
+            atlas_other (str): option to use this atlas for gene extraction
+            all_samples (bool): returns aggregate samples (across regions) or all samples
     """
-    dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
+    if kwargs.get("all_samples"):
+        dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-samples.csv') 
+    else:
+        dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
 
-    gene_symbols = _get_gene_symbols(atlas_other, which_genes, percentile)
+    if kwargs.get("atlas_other"):
+        gene_symbols = _get_gene_symbols(kwargs["atlas_other"], which_genes, percentile)
+    else:
+        gene_symbols = _get_gene_symbols(atlas, which_genes, percentile)
 
     return dataframe[list(gene_symbols) + list(dataframe.filter(regex=("[_].*")).columns)]
 
@@ -273,6 +299,9 @@ def _center_scale(dataframe):
     Args:
         dataframe: given by return_grouped_data
     """
+
+    keyboard
+    
     # center the dataframe
     df_center_scale = dataframe - np.mean(dataframe, axis = 0)
     

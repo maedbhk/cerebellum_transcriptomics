@@ -240,22 +240,38 @@ def _make_colormap(atlas):
             atlas (str): the name of the atlas to use
     """
 
-    if atlas in Defaults.colour_info: 
-        df = pd.read_csv(Defaults.EXTERNAL_DIR / "atlas_templates" / f"{atlas}-info.csv")
-        colors = df['colours']
-        # colors = Defaults.colour_info[atlas]
-        colors_rgb = [[np.round(y / 255, 2) for y in ast.literal_eval(x)] for x in colors]
-        # colors_rgb = colors_rgb[1:] # don't know why I did this?!
-            
-        cmap_name = f"{atlas}"
-            
-        cm = LinearSegmentedColormap.from_list(cmap_name, colors_rgb, N=len(colors_rgb))
+    atlas_info = Defaults.EXTERNAL_DIR / "atlas_templates" / f"{atlas}-info.csv"
+    if os.path.isfile(atlas_info): 
+        df = pd.read_csv(atlas_info)
+
+        colors = df.apply(lambda x: list([x['r'],
+                                        x['g'],
+                                        x['b']]), axis=1) 
+
+        regions = df['region_id']
+
+        # if transcriptomic, don't divide by 255
+        if atlas=="MDTB-10-subRegions-transcriptomic":
+            colors_rgb = [[np.round(y, 2) for y in x] for x in colors]
+        else:
+            colors_rgb = [[np.round(y / 255, 2) for y in x] for x in colors]
+
+        # remove any nan colors (applicable for transcriptomic parcellation)
+        colors_all = []
+        labels = []
+        for i, rgb in enumerate(colors_rgb):
+            if any([np.isnan(x) for x in rgb]):
+                pass
+            else:
+                colors_all.append(rgb)
+                labels.append(regions[i])
+
+        cm = LinearSegmentedColormap.from_list(atlas, colors_all, N=len(colors_all))
     else: 
         cm = "Accent"
-        df = pd.DataFrame()
-        df['region_id'] = []
+        labels = []
 
-    return cm, df['region_id']
+    return cm, labels
 
 def _make_colorpalette(atlas):
 
@@ -271,31 +287,28 @@ def _make_colorbar(atlas, ax=None):
         
         Args:
             atlas (str): the name of the atlas to use
+            info_file (bool): does this colorbar have an info file?
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(1, 10))
 
-    if atlas in Defaults.colour_info: 
-        cmap, labels = _make_colormap(atlas)
+    cmap, labels = _make_colormap(atlas)
 
-        bounds = np.arange(cmap.N + 1)
+    bounds = np.arange(cmap.N + 1)
 
-        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
-        cb3 = mpl.colorbar.ColorbarBase(ax, cmap=cmap.reversed(cmap), 
-                                        norm=norm,
-                                        ticks=bounds,
-                                        format='%s',
-                                        orientation='vertical',
-                                        )
-        cb3.set_ticklabels(labels.to_list()[::-1])  
-        cb3.ax.tick_params(size=0)
-        cb3.set_ticks(bounds+.5)
-        cb3.ax.tick_params(axis='y', which='major', labelsize=30)
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    cb3 = mpl.colorbar.ColorbarBase(ax, cmap=cmap.reversed(cmap), 
+                                    norm=norm,
+                                    ticks=bounds,
+                                    format='%s',
+                                    orientation='vertical',
+                                    )
+    cb3.set_ticklabels(labels[::-1])  
+    cb3.ax.tick_params(size=0)
+    cb3.set_ticks(bounds+.5)
+    cb3.ax.tick_params(axis='y', which='major', labelsize=30)
 
-        plt.savefig(str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{atlas}-colorbar.png"), bbox_inches='tight')
-
-    else:
-        print('atlas info csv file does not exist')
+    plt.savefig(str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{atlas}-colorbar.png"), bbox_inches='tight')
 
 def _make_colorbar_donor(ax=None):
     """ Helper function to make a matplotlib colorbar - specifically for donor.
@@ -329,9 +342,17 @@ def _make_colorbar_donor(ax=None):
 
     plt.savefig(str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{cmap_name}-colorbar.png"), bbox_inches='tight')
 
-def _get_colors_transcriptomic_atlas(dataframe):
+def save_colors_transcriptomic_atlas():
+    """
+    this function saves colors + labels
+    based on dendrogram clustering for MDTB-10-subRegions
+    not customised for any other atlas
+    """
+
+    df = ana.return_grouped_data(atlas="MDTB-10-subRegions", atlas_other="MDTB-10", remove_outliers=True)
+    labels = Defaults.labels['MDTB-10-subRegions']
     
-    R = dendrogram_plot(dataframe.T)
+    R = dendrogram_plot(df.T)
     
     regex = r"(\d+)-(\w+)"
 
@@ -349,20 +370,46 @@ def _get_colors_transcriptomic_atlas(dataframe):
         else:
             index.append(int(group[0]) + 10)
 
-    index.append(9) # this region wasn't included, too few samples collected
+    # zero index the regions
     index = [i-1 for i in index] # zero index
 
-    colors = sns.cubehelix_palette(19, start=12, rot=0.8, dark=0.1, light=1.0, reverse=True)
-    colors.append([0.5,0.5,0.5])
+    # figure out which regions are missing
+    res = [ele for ele in range(max(index)+1) if ele not in index]
 
-    return [x[1] for x in sorted(zip(index, colors), key=lambda x: x[0])]
+    # assign colors to clusters
+    colors = sns.color_palette("coolwarm", len(index))
+    # convert to list
+    colors = [list(ele) for ele in colors]
 
-def interactive_cortex(atlas, mesh='very_inflated', hemisphere="L"):
+    # append NaN color values to missing regions
+    for ele in res:
+        colors.append(np.tile(float("NaN"),3).tolist())
+
+    # put the rgb colors in sorted order
+    colors_dendrogram = [x[1] for x in sorted(zip(index+res, colors), key=lambda x: x[0])]
+
+    color_r = []
+    color_g = []
+    color_b = []
+    for i in np.arange(len(colors_dendrogram)):
+        color_r.append(np.round(colors_dendrogram[i][0],2))
+        color_g.append(np.round(colors_dendrogram[i][1],2))
+        color_b.append(np.round(colors_dendrogram[i][2],2))
+
+    data = {'region_num':list(range(1,len(labels)+1)), 'region_id': labels, 'r': color_r, 'g':color_g, 'b':color_b}
+
+    # create dataframe
+    df_new = pd.DataFrame(data) 
+
+    df_new.to_csv(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", "MDTB-10-subRegions-transcriptomic-info.csv"))
+
+def interactive_cortex(atlas, info_file=True, mesh='very_inflated', hemisphere="L"):
     """ Plots an interactive cortical surface map. Options for mesh and map can be found in 
         'fs_LR_32'. Options for mesh end with 'surf.gii' and options for atlas end with 'label.gii'
         
         Args:
             atlas (str): the name of the atlas to use for mapping labelled data onto surface
+            info_file (bool): does the atlas have an associated info file
             mesh (str): the name of the mesh to use for visualizing labelled data on surface.
             Default is 'very_inflated'
             hemisphere (str): hemisphere to visualize. Options are "L" and "R". Default is "L".
@@ -383,7 +430,7 @@ def interactive_cortex(atlas, mesh='very_inflated', hemisphere="L"):
 
     view.open_in_browser()
 
-def interactive_cerebellum(atlas, surf_mesh = "PIAL_SUIT.surf.gii"):
+def interactive_cerebellum(atlas, info_file=True, surf_mesh = "PIAL_SUIT.surf.gii"):
     os.chdir(Defaults.EXTERNAL_DIR /  "atlas_templates")
 
     surf_map_data = surface.load_surf_data(f"{atlas}.label.gii").astype('int32')
@@ -398,12 +445,13 @@ def interactive_cerebellum(atlas, surf_mesh = "PIAL_SUIT.surf.gii"):
 
     view.open_in_browser()
 
-def _make_png_cortex(atlas, mesh='very_inflated', hemisphere="L", view="lateral", ax=None, save=True, resize=True):
+def _make_png_cortex(atlas, info_file=True, mesh='very_inflated', hemisphere="L", view="lateral", ax=None, save=True, resize=True):
     """ Plots a cortical surface map. Options for mesh and map can be found in 
         'fs_LR_32'. Options for mesh end with 'surf.gii' and options for atlas end with 'label.gii'
         
         Args:
             atlas (str): the name of the atlas to use for mapping labelled data onto surface
+            info_file (bool): does the atlas have an info file
             mesh (str): the name of the mesh to use for visualizing labelled data on surface.
             Default is 'very_inflated'
             hemisphere (str): hemisphere to visualize. Options are "L" and "R". Default is "L".
@@ -878,7 +926,7 @@ def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, 
         dataframe = _reorder_dendrogram_leaves(dataframe)
 
     if color_leaves:
-        set_link_color_palette(['r', 'b', 'y', 'm'])
+        set_link_color_palette(['b', 'r', 'y', 'm'])
     else:
         set_link_color_palette(['k', 'k', 'k', 'k'])
 
@@ -985,6 +1033,15 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
     # ax.title('Correlation Matrix', fontsize=20)
 
 def raster_plot(dataframe, ax=None, gene_reorder=True, cbar=True, **kwargs):
+    """ Plots raster plot, rows are genes and columns are rois
+        Args:
+            dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
+            ax (bool): figure axes. Default is None
+            gene_reorder (bool): reorders rows of raster plot according to dendrogram results. default is True.
+            cbar (bool): option to plot a colorbar. default is True.
+                kwargs (dict): dictionary of additional (optional) kwargs.
+                may include any graphical argument relevant to seaborn's heatmap
+    """
     if ax is None:
         plt.figure(num=1, figsize=[25,15])
 

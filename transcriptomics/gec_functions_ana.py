@@ -10,7 +10,17 @@ from matplotlib import cm
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+import itertools
+
+from sklearn.model_selection import train_test_split
+import sklearn.linear_model as lm
+from sklearn.metrics import confusion_matrix
+from sklearn import tree
+from sklearn.model_selection import train_test_split
 from sklearn import cluster
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import f1_score
+from sklearn.metrics import auc
 
 from transcriptomics.constants import Defaults
 from transcriptomics.visualization import visualize
@@ -86,7 +96,7 @@ def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
                 donor_num (int): any one of the 6 donors
                 all_samples (bool): returns aggregate samples (across regions) or all samples
     """
-    
+
     dataframe = _threshold_data(atlas, which_genes, percentile, **kwargs)
 
     if kwargs.get("atlas_other"):
@@ -299,8 +309,6 @@ def _center_scale(dataframe):
     Args:
         dataframe: given by return_grouped_data
     """
-
-    keyboard
     
     # center the dataframe
     df_center_scale = dataframe - np.mean(dataframe, axis = 0)
@@ -397,5 +405,116 @@ def _compute_k_means_n_dims(dataframe, num_clusters):
     df_n_dims = grouped.sum()
     
     return df_n_dims
+
+def _split_train_test(X, Y, test_size):
+    """ divides X and Y into train and test sets
+        Args:
+            X (matrix): training data
+            Y (vector): labelled data
+            test_size (int): size of test size, usually .2
+        Returns:
+            x_train, x_test, y_train, y_test
+    """
+    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=test_size)
+
+    return x_train, x_test, y_train, y_test
+
+def _fit_logistic_regression(x_train, y_train, fit_intercept=True, solver='lbfgs'):
+    """ fit logistic regression model - crossvalidated
+        Args:
+            X (matrix):
+            Y (vector):
+            test_size (int): default is .2
+            fit_intercept (bool): default is True
+            solver (str): default is 'lbfgs'
+        Return:
+            logistic model
+    """
+    lr = lm.LogisticRegression(fit_intercept=fit_intercept, solver=solver)
+
+    lr.fit(x_train, y_train)
+
+    return lr
+
+def _confusion_matrix(X, Y, confusion_type="accuracy", test_size=.2):
+    """ Returns confusion matrix for either accuracy or precision_recall
+        Args:
+            X (matrix): training data
+            Y (vector): labelled data
+            test_size (int): default is .w
+            type (str): "accuracy" or "precision_recall"
+        Returns:
+            confusion matrix
+    """
+    x_train, x_test, y_train, y_test = _split_train_test(X, Y, test_size)
+
+    lr = _fit_logistic_regression(x_train, y_train, test_size)
+
+    if confusion_type=="accuracy":
+        cnf_matrix = confusion_matrix(y_test, lr.predict(x_test))
+    elif confusion_type=="precision_recall":
+        cnf_matrix = np.zeros((2, 2))
+        cnf_matrix[0][0] = sum((y_test == lr.predict(x_test)) & (y_test == 1)) # true positive
+        cnf_matrix[0][1] = sum((y_test != lr.predict(x_test)) & (y_test == 0)) # false positive
+        cnf_matrix[1][0] = sum((y_test != lr.predict(x_test)) & (y_test == 1)) # false negative
+        cnf_matrix[1][1] = sum((y_test == lr.predict(x_test)) & (y_test == 0)) # true negative
+    else:
+        print('confusion matrix type does not exist. options are accuracy or precision_recall')
+
+    return cnf_matrix
+
+def _predict_prob(X, Y, test_size):
+    x_train, x_test, y_train, _ = _split_train_test(X, Y, test_size=test_size)
+
+    lr = _fit_logistic_regression(x_train, y_train)
+
+    # get probabilities
+    lr_probs = lr.predict_proba(x_test)
+
+    # keep probabilities for the positive outcome only
+    lr_probs = lr_probs[:, 1]
+
+    # predict class values
+    y_pred = lr.predict(x_test)
+
+    return y_pred, lr_probs
+
+def _recall_precision(X, Y, test_size=.2):
+    # get recall and precision
+    _, _, _, y_test = _split_train_test(X, Y, test_size=test_size)
+
+    y_pred, lr_probs = _predict_prob(X, Y, test_size=test_size)
+
+    lr_precision, lr_recall, _ = precision_recall_curve(y_test, lr_probs)
+
+    lr_f1, lr_auc = f1_score(y_test, y_pred), auc(lr_recall, lr_precision)
+
+    return lr_precision, lr_recall
+
+def _get_X_Y(atlas, dataframe):
+    """ returns training data (X), labelled data (Y), and classes
+        Args:
+            dataframe: dataframe containing X, Y, and classes
+            atlas (str): which atlas are we working with? defines classes based on atlas
+        Returns:
+            X, Y, classes
+    """
+    # x_cols = _get_gene_symbols(atlas="MDTB-10", which_genes='top', percentile=1)
+    x_cols = dataframe.filter(regex=("[A-Z0-9].*")).columns
+
+    if atlas=="MDTB-10-subRegions":
+        dataframe['class_num'] = dataframe['region_num'].apply(lambda x: 1 if x<11 else 2)
+        dataframe['class_name'] = dataframe['region_id'].str.extract(r'-(\w+)')
+    else:
+        dataframe['class_num'] = dataframe['region_num']
+        dataframe['class_name'] = dataframe['region_id']
+
+    X = dataframe[x_cols]
+    Y = dataframe['class_num']
+
+    classes = dataframe['class_name'].unique()
+
+    return X, Y, classes
+
 
 # __all__ = ["save_expression_data", "save_atlas_info", "save_thresholded_data"]

@@ -15,6 +15,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.image as mpimg
 from PIL import Image
+import itertools
 
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster, set_link_color_palette
 from sklearn import cluster
@@ -1193,6 +1194,74 @@ def corrplot(corr_matrix, size_scale=500, marker='s'):
         y_order=corr_matrix.columns[::-1],
         size_scale=size_scale
     )
+
+def confusion_matrix_plot(atlas, dataframe, confusion_type="accuracy", normalize=True, test_size=.2, ax=None):
+    """ This function prints and plots the confusion matrix.
+        Args:
+            dataframe: dataframe. should have x_cols, y_col, class_col
+            x_cols (list): list of col names for training data
+            y_col: col name for labelled data. default is 'region_num'
+            class_col: default is 'region_id'
+            normalize (bool): normalization can be applied by setting `normalize=True`
+    """
+    np.random.seed(47)
+
+    if ax is None:
+        plt.figure(num=1, figsize=[25,15])
+
+    X, Y, classes = ana._get_X_Y(atlas, dataframe)
+
+    cm = ana._confusion_matrix(X, Y, confusion_type=confusion_type, test_size=test_size)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        title = "Normalized confusion matrix"
+    else:
+        title = 'Confusion matrix, without normalization'
+
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    # plt.title(title)
+
+def precision_recall_plot(atlas, dataframe, test_size=.2, ax=None):
+    np.random.seed(47)
+
+    if ax is None:
+        plt.figure(num=1, figsize=[25,15])
+    
+    X, Y, _ = ana._get_X_Y(atlas, dataframe)
+
+    _, _, _, y_test = ana._split_train_test(X, Y, test_size=test_size)
+
+    lr_precision, lr_recall = ana._recall_precision(X, Y, test_size=test_size)
+
+    # plot the precision-recall curves
+    no_skill = len(y_test[y_test==1]) / len(y_test)
+
+    plt.plot([0, 1], [no_skill, no_skill], linestyle='--', label='No Skill')
+    plt.plot(lr_recall, lr_precision, marker='.', label='Logistic')
+    
+    # axis labels
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    
+    # show the legend
+    plt.legend()
+    # show the plot
+    plt.show()
 
 def _color_list():
     """ Helper function, returns rgb colorlist. Doesn't take args.

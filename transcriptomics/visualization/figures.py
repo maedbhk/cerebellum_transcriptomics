@@ -244,7 +244,6 @@ def fig_4_new():
 
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "fig_4"), bbox_inches="tight", dpi=300)
 
-
 def supp_1_new(atlas_anat="SUIT-10", atlas_cerebellum_task="MDTB-10-subRegions", atlas_cerebellum_rs="Buckner-7", atlas_cortex_rs="Yeo-7", which_genes='top', percentile=1, remove_outliers=True, atlas_other="MDTB-10"):
     # fig = plt.figure()
     fig = plt.figure(figsize=(15,15))
@@ -397,6 +396,19 @@ def supp_4_new(atlas="SUIT-26", which_genes='top', percentile=1, remove_outliers
     visualize.simple_corr_heatmap(dataframe, ax=ax1)
 
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_4"), bbox_inches="tight", dpi=300)
+
+def supp_5_new(atlas='SUIT-10', which_genes='top', atlas_other="MDTB-10", percentile=1):
+    fig = plt.figure()
+    gs = GridSpec(1, 2, figure=fig)
+
+    # return all samples dataframe
+    df = ana.return_thresholded_data(atlas=atlas, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, all_samples=True)
+
+    ax1 = fig.add_subplot(gs[0, 0])
+    visualize.confusion_matrix_plot(atlas, df, confusion_type="accuracy", ax=ax1)
+
+    ax2 = fig.add_subplot(gs[0, 1])
+    visualize.precision_recall_plot(atlas, df, ax=ax2)
 
 def fig_methods(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True, **kwargs):
     """This function plots figure 1. This is a descriptive figure so it 

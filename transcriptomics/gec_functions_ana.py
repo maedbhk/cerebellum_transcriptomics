@@ -1,4 +1,5 @@
 import re
+import os
 from collections import namedtuple
 
 import numpy as np
@@ -14,13 +15,17 @@ import itertools
 
 from sklearn.model_selection import train_test_split
 import sklearn.linear_model as lm
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn import tree
-from sklearn.model_selection import train_test_split
 from sklearn import cluster
+from sklearn import svm
+from sklearn.model_selection import KFold
 from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import average_precision_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import auc
+from sklearn.preprocessing import label_binarize
 
 from transcriptomics.constants import Defaults
 from transcriptomics.visualization import visualize
@@ -45,14 +50,22 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, **kwargs):
                 unthresholded (bool): returns grouped data for unthresholded data.
     """
     # option to get genes from another atlas
-    if kwargs.get("atlas_other"):
-        dataframe = _threshold_data(atlas, which_genes, percentile, kwargs["atlas_other"])
+    # if kwargs.get("atlas_other"):
+    #     dataframe = _threshold_data(atlas=atlas, which_genes=which_genes, percentile=percentile, **kwargs) #  kwargs["atlas_other"]
     
     # option to get thresholded or unthresholded data
     if kwargs.get("unthresholded"):
         dataframe = return_unthresholded_data(atlas)
     else:
-        dataframe = return_thresholded_data(atlas, which_genes=which_genes, percentile=percentile)
+        # dataframe = return_thresholded_data(atlas, which_genes=which_genes, percentile=percentile, **kwargs)
+        dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
+
+    # threshold based on gene symbols
+    if kwargs.get("atlas_other"):
+        genes = _get_gene_symbols(kwargs["atlas_other"], which_genes, percentile)
+    else:
+        genes = _get_gene_symbols(atlas, which_genes, percentile)
+    dataframe = dataframe[list(genes) + list(dataframe.filter(regex=("[_].*")).columns)]
 
     # option to remove outliers
     if kwargs.get("remove_outliers"):
@@ -78,10 +91,8 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, **kwargs):
 
     return dataframe
 
-    # df = do_something(df, **kwargs)
-
 def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
-    """This function returns thresholded data for a specified atlas. 
+    """This function returns thresholded (ungrouped) data for a specified atlas. 
        By default, returns the aggregate data (across regions) but there's also an option
        to return all samples
 
@@ -96,8 +107,12 @@ def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
                 donor_num (int): any one of the 6 donors
                 all_samples (bool): returns aggregate samples (across regions) or all samples
     """
+    # dataframe = _threshold_data(atlas=atlas, which_genes=which_genes, percentile=percentile, **kwargs)
 
-    dataframe = _threshold_data(atlas, which_genes, percentile, **kwargs)
+    if kwargs.get("all_samples"):
+        dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-samples.csv') 
+    else:
+        dataframe = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv') 
 
     if kwargs.get("atlas_other"):
         genes = _get_gene_symbols(kwargs["atlas_other"], which_genes, percentile)
@@ -134,7 +149,7 @@ def return_unthresholded_data(atlas, **kwargs):
 
     return out_name
 
-def return_concatenated_data(atlas_cerebellum, atlas_cortex, which_genes='top', percentile=1, normalize=True, **kwargs):
+def return_concatenated_data(atlas_cerebellum, atlas_cortex, which_genes='top', percentile=1, **kwargs):
     """This function returns concatenated dataframe for grouped and thresholded cortical and cerebellar data.
 
     Args:
@@ -148,10 +163,11 @@ def return_concatenated_data(atlas_cerebellum, atlas_cortex, which_genes='top', 
                 atlas_other (str): returns thresholded data using genes from another atlas
                 donor_num (int): any one of the 6 donors 
                 remove_outliers (bool): certain atlases have outliers that should be removed (i.e. SUIT-10)
+                normalize (bool): whether or not to normalize (center and scale) the data
     """
 
-    dataframe_1 = return_grouped_data(atlas_cortex, which_genes=which_genes, percentile=percentile, normalize=normalize, **kwargs)
-    dataframe_2 = return_grouped_data(atlas_cerebellum, which_genes=which_genes, percentile=percentile, normalize=normalize, **kwargs)
+    dataframe_1 = return_grouped_data(atlas_cortex, which_genes=which_genes, percentile=percentile, **kwargs)
+    dataframe_2 = return_grouped_data(atlas_cerebellum, which_genes=which_genes, percentile=percentile, **kwargs)
     
     # add prefix to col names and reset index
     dataframe_1 = dataframe_1.add_prefix(f"{atlas_cortex}-").reset_index().rename({'index': f'gene_symbols-{atlas_cortex}'},axis=1)
@@ -160,12 +176,81 @@ def return_concatenated_data(atlas_cerebellum, atlas_cortex, which_genes='top', 
     df_concat = pd.concat([dataframe_1, dataframe_2], axis=1)
     
     # center and scale concatenated dataframe
-    if normalize:
+    if kwargs.get("normalize"):
         df_concat = _center_scale(df_concat.drop({f'gene_symbols-{atlas_cortex}', f'gene_symbols-{atlas_cerebellum}'}, axis=1))
     else:
         df_concat = df_concat.drop({f'gene_symbols-{atlas_cortex}', f'gene_symbols-{atlas_cerebellum}'}, axis=1)
 
     return df_concat
+
+def save_colors_transcriptomic_atlas(atlas="MDTB-10-subRegions", atlas_other="MDTB-10", remove_outliers=True, normalize=True):
+    """ this function saves colors + labels based on dendrogram clustering for MDTB-10-subRegions not customised for any other atlas
+        Args: 
+            atlas (str): "MDTB-10-subRegions"
+            atlas_other (str): "MDTB-10"
+            remove_outliers (bool): default is True
+            normalize (bool): default is True
+    """
+
+    df = return_grouped_data(atlas=atlas, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
+    
+    R = visualize.dendrogram_plot(df.T)
+    
+    regex = r"(\d+)-(\w+)"
+
+    # get atlas labels
+    groups = []
+    for p in R['ivl']:
+        match = re.findall(regex, p)[0]
+        groups.append(match)
+
+    # get indices for labels
+    index = []
+    for group in groups:
+        if group[1]=='A':
+            index.append(int(group[0]))
+        else:
+            index.append(int(group[0]) + 10)
+
+    # zero index the regions
+    index = [i-1 for i in index] # zero index
+
+    # figure out which regions are missing
+    res = [ele for ele in range(max(index)+1) if ele not in index]
+
+    for reorder in [True, False]:
+        # assign colors to clusters
+        colors = sns.color_palette("coolwarm", len(index))
+        # convert to list
+        colors = [list(ele) for ele in colors]
+        if reorder:
+            # append NaN color values to missing regions
+            for ele in res:
+                colors.append(np.tile(float("NaN"),3).tolist())
+            # put the rgb colors in sorted order
+            colors_dendrogram = [x[1] for x in sorted(zip(index+res, colors), key=lambda x: x[0])]
+            labels = Defaults.labels[atlas] 
+            outname = f"{atlas}-transcriptomic-info.csv"
+        else:
+            # don't sort the rgb colors
+            colors_dendrogram = colors[::-1]
+            labels = R['ivl'][::-1]
+            outname = f"{atlas}-transcriptomic-dendrogram-ordering-info.csv"
+
+        color_r = []
+        color_g = []
+        color_b = []
+        for i in np.arange(len(colors_dendrogram)):
+            color_r.append(np.round(colors_dendrogram[i][0],2))
+            color_g.append(np.round(colors_dendrogram[i][1],2))
+            color_b.append(np.round(colors_dendrogram[i][2],2))
+
+        data = {'region_num':list(range(1,len(labels)+1)), 'region_id': labels, 'r': color_r, 'g':color_g, 'b':color_b}
+
+        # create dataframe
+        df_new = pd.DataFrame(data) 
+
+        df_new.to_csv(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", outname))
 
 def _bootstrap_dendrogram(atlas, num_iter=10000):
 
@@ -259,8 +344,8 @@ def _get_gene_symbols(atlas, which_genes, percentile):
     return gene_symbols
 
 def _threshold_data(atlas, which_genes, percentile, **kwargs):
-    """This function returns thresholded data for a specified atlas
-    using a subset of genes from another atlas
+    """This function returns thresholded data for a specified atlas. 
+    option to use a subset of genes from another atlas
 
     Args:
         atlas (str): the name of the atlas to return
@@ -406,115 +491,283 @@ def _compute_k_means_n_dims(dataframe, num_clusters):
     
     return df_n_dims
 
-def _split_train_test(X, Y, test_size):
-    """ divides X and Y into train and test sets
+def _split_train_test(X, y, test_size):
+    """ divides X and y into train and test sets
         Args:
             X (matrix): training data
-            Y (vector): labelled data
+            y (vector): labelled data
             test_size (int): size of test size, usually .2
         Returns:
             x_train, x_test, y_train, y_test
     """
-    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=test_size)
+    # y = label_binarize(y, classes)
 
-    return x_train, x_test, y_train, y_test
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
 
-def _fit_logistic_regression(x_train, y_train, fit_intercept=True, solver='lbfgs'):
+    return X_train, X_test, y_train, y_test
+
+def _run_classifier_multiclass(X, y, classifier='logistic', test_size=.2): 
     """ fit logistic regression model - crossvalidated
         Args:
-            X (matrix):
-            Y (vector):
+            X_train (matrix):
+            y_train (vector):
+            classifier (str): 'logistic', 'svm' etc
             test_size (int): default is .2
             fit_intercept (bool): default is True
-            solver (str): default is 'lbfgs'
+
+            Kwargs:
+                solver (str): default is 'lbfgs'
         Return:
             logistic model
     """
-    lr = lm.LogisticRegression(fit_intercept=fit_intercept, solver=solver)
+    random_state = np.random.seed(47)
 
-    lr.fit(x_train, y_train)
+    X_train, X_test, y_train, y_test = _split_train_test(X, y, test_size=test_size)
 
-    return lr
+    if classifier=='logistic':
+        classifier = lm.LogisticRegression(fit_intercept=True, multi_class='ovr', solver='lbfgs')  #multi_class='ovr'  
+        classifier.fit(X_train, y_train)
+        classifier_probs = classifier.predict_proba(X_test)
+    elif classifier=="svm":
+        classifier = OneVsRestClassifier(svm.LinearSVC(random_state=random_state))
+        classifier.fit(X_train, y_train)
+        classifier_probs = classifier.decision_function(X_test)
 
-def _confusion_matrix(X, Y, confusion_type="accuracy", test_size=.2):
+    # predict class values
+    y_pred = classifier.predict(X_test)
+
+    return classifier, classifier_probs, y_pred, y_test
+
+def _run_classifier_binary(X, y, classifier='logistic', test_size=.2):
+    """ fit logistic regression model - crossvalidated
+        Args:
+            X_train (matrix):
+            y_train (vector):
+            classifier (str): 'logistic', 'svm' etc
+            test_size (int): default is .2
+            fit_intercept (bool): default is True
+
+            Kwargs:
+                solver (str): default is 'lbfgs'
+        Return:
+            logistic model
+    """
+    random_state = np.random.seed(47)
+
+    X_train, X_test, y_train, y_test = _split_train_test(X, y, test_size=test_size)
+
+    if classifier=='logistic':
+        classifier = lm.LogisticRegression(fit_intercept=True, solver='lbfgs') # solver='lbfgs'
+        classifier.fit(X_train, y_train)
+        classifier_probs = classifier.predict_proba(X_test)
+        # keep probabilities for the positive outcome only
+        classifier_probs = classifier_probs[:,1]
+    elif classifier=="svm":
+        classifier = svm.LinearSVC(random_state=random_state)
+        classifier.fit(X_train, y_train)
+        classifier_probs = classifier.decision_function(X_test)
+
+    # predict class values
+    y_pred = classifier.predict(X_test)
+
+    return classifier, classifier_probs, y_pred, y_test
+
+def _confusion_matrix(X, y, classifier='logistic', label_type='multi-class', test_size=.2):
     """ Returns confusion matrix for either accuracy or precision_recall
         Args:
             X (matrix): training data
-            Y (vector): labelled data
+            y (vector): labelled data
             test_size (int): default is .w
             type (str): "accuracy" or "precision_recall"
         Returns:
             confusion matrix
     """
-    x_train, x_test, y_train, y_test = _split_train_test(X, Y, test_size)
+    # run classifier
+    if label_type=="multi-class":
+        _, _, y_pred, y_test = _run_classifier_multiclass(X, y, classifier, test_size)
+        f1 = f1_score(y_test, y_pred, average='micro')
+    elif label_type=="binary":
+        _, _, y_pred, y_test = _run_classifier_binary(X, y, classifier, test_size)
+        f1 = f1_score(y_test, y_pred)
+    else: 
+        print(f'{label_type} does not exist. options are multi-class or binary')
 
-    lr = _fit_logistic_regression(x_train, y_train, test_size)
+    cnf_matrix = confusion_matrix(y_test, y_pred)
 
-    if confusion_type=="accuracy":
-        cnf_matrix = confusion_matrix(y_test, lr.predict(x_test))
-    elif confusion_type=="precision_recall":
-        cnf_matrix = np.zeros((2, 2))
-        cnf_matrix[0][0] = sum((y_test == lr.predict(x_test)) & (y_test == 1)) # true positive
-        cnf_matrix[0][1] = sum((y_test != lr.predict(x_test)) & (y_test == 0)) # false positive
-        cnf_matrix[1][0] = sum((y_test != lr.predict(x_test)) & (y_test == 1)) # false negative
-        cnf_matrix[1][1] = sum((y_test == lr.predict(x_test)) & (y_test == 0)) # true negative
+    return cnf_matrix, f1
+
+def _recall_precision(X, y, classifier='logistic', label_type='multi-class', test_size=.2):
+    if label_type=="multi-class":
+        # run classifier on multi-class data
+        classifier, classifier_probs, y_pred, y_test = _run_classifier_multiclass(X, y, classifier, test_size)
+
+        # calculate precision and recall for multi-class
+        y_binarized = label_binarize(y_test, y_test.unique())
+        n_classes = y_binarized.shape[1]
+        precision = dict()
+        recall = dict()
+        average_precision = dict()
+        for i in range(n_classes):
+            precision[i], recall[i], _ = precision_recall_curve(y_binarized[:, i], classifier_probs[:, i])
+            average_precision[i] = average_precision_score(y_binarized[:, i], classifier_probs[:, i])
+
+        # A "micro-average": quantifying score on all classes jointly
+        precision["micro"], recall["micro"], _ = precision_recall_curve(y_binarized.ravel(),
+        classifier_probs.ravel())
+        average_precision["micro"] = average_precision_score(y_binarized, classifier_probs,
+                                                        average="micro")
+        f1 = f1_score(y_test, y_pred, average='micro')
+        # f1 = f1_score(y_test, y_pred, average=None) # f1 for all classes
+
+    elif label_type=="binary":
+        # run classifier on binary data
+        classifier, classifier_probs, y_pred, y_test = _run_classifier_binary(X, y, classifier, test_size)
+
+        precision, recall, _ = precision_recall_curve(y_test, classifier_probs) 
+        average_precision = average_precision_score(y_test, classifier_probs) 
+        n_classes = 1 
+        f1, auc_score = f1_score(y_test, y_pred), auc(recall, precision)            
     else:
-        print('confusion matrix type does not exist. options are accuracy or precision_recall')
+        print(f'{label_type} does not exist. options are multi-class or binary')               
 
-    return cnf_matrix
+    return precision, recall, average_precision, n_classes, f1
 
-def _predict_prob(X, Y, test_size):
-    x_train, x_test, y_train, _ = _split_train_test(X, Y, test_size=test_size)
-
-    lr = _fit_logistic_regression(x_train, y_train)
-
-    # get probabilities
-    lr_probs = lr.predict_proba(x_test)
-
-    # keep probabilities for the positive outcome only
-    lr_probs = lr_probs[:, 1]
-
-    # predict class values
-    y_pred = lr.predict(x_test)
-
-    return y_pred, lr_probs
-
-def _recall_precision(X, Y, test_size=.2):
-    # get recall and precision
-    _, _, _, y_test = _split_train_test(X, Y, test_size=test_size)
-
-    y_pred, lr_probs = _predict_prob(X, Y, test_size=test_size)
-
-    lr_precision, lr_recall, _ = precision_recall_curve(y_test, lr_probs)
-
-    lr_f1, lr_auc = f1_score(y_test, y_pred), auc(lr_recall, lr_precision)
-
-    return lr_precision, lr_recall
-
-def _get_X_Y(atlas, dataframe):
+def _get_X_y(atlas, dataframe, label_type):
     """ returns training data (X), labelled data (Y), and classes
         Args:
             dataframe: dataframe containing X, Y, and classes
             atlas (str): which atlas are we working with? defines classes based on atlas
+            label_type (str): 'multi-class' or 'binary'
         Returns:
-            X, Y, classes
+            X, y, classes
     """
     # x_cols = _get_gene_symbols(atlas="MDTB-10", which_genes='top', percentile=1)
     x_cols = dataframe.filter(regex=("[A-Z0-9].*")).columns
 
-    if atlas=="MDTB-10-subRegions":
-        dataframe['class_num'] = dataframe['region_num'].apply(lambda x: 1 if x<11 else 2)
-        dataframe['class_name'] = dataframe['region_id'].str.extract(r'-(\w+)')
-    else:
-        dataframe['class_num'] = dataframe['region_num']
-        dataframe['class_name'] = dataframe['region_id']
+    if label_type=="binary":
+        if atlas=="MDTB-10-subRegions":
+            dataframe['class_num'] = dataframe['region_num'].apply(lambda x: 0 if x<11 else 1)
+            dataframe['class_name'] = dataframe['region_id'].str.extract(r'-(\w+)')
+        else:
+            print(f'binary option not available for {atlas}')
+
+    if label_type=="multi-class":
+            dataframe['class_num'] = dataframe['region_num']
+            dataframe['class_name'] = dataframe['region_id']
 
     X = dataframe[x_cols]
-    Y = dataframe['class_num']
+    y = dataframe['class_num']
 
     classes = dataframe['class_name'].unique()
 
-    return X, Y, classes
+    return X, y, classes
 
+def _compute_CV_error(model, X, y, test_size=.2):
+    '''
+    Split the training data into 4 subsets.
+    For each subset, 
+        fit a model holding out that subset
+        compute the MSE on that subset (the validation set)
+    You should be fitting 4 models total.
+    Return the average MSE of these 4 folds.
+
+    Args:
+        model: an sklearn model with fit and predict functions 
+        X_train (data_frame): Training data
+        y_train (data_frame): Label 
+
+    Return:
+        the average validation MSE for the 4 splits.
+    '''
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+
+    kf = KFold(n_splits=4)
+    validation_errors = []
+    
+    for train_idx, valid_idx in kf.split(X_train):
+
+        # split the data
+        split_X_train, split_X_valid = X_train.iloc[train_idx], X_train.iloc[valid_idx]
+        split_y_train, split_y_valid = y_train.iloc[train_idx], y_train.iloc[valid_idx]
+      
+        # Fit the model on the training split
+        model.fit(split_X_train, split_y_train)
+        
+        error = _rmse(model.predict(split_X_valid), split_y_valid)
+
+        validation_errors.append(error)
+        
+    return np.mean(validation_errors)
+
+def _compute_test_train_error(model, X, y, test_size=.2):
+    train_error_vs_N = []
+    test_error_vs_N = []
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+
+    range_of_num_features = range(1, X_train.shape[1] + 1)
+
+    for N in range_of_num_features:
+        X_train_first_N_features = X_train.iloc[:, :N]    
+        
+        model.fit(X_train_first_N_features, y_train)
+        train_error = _rmse(model.predict(X_train_first_N_features), y_train)
+        train_error_vs_N.append(train_error)
+        
+        X_test_first_N_features = X_test.iloc[:, :N]
+        test_error = _rmse(model.predict(X_test_first_N_features), y_test)    
+        test_error_vs_N.append(test_error)
+
+    return test_error_vs_N, train_error_vs_N, range_of_num_features
+
+def _rmse(y_pred, y_test, test_size=.2):
+    """
+    Args:
+        y_pred: an array of the prediction from the model
+        y_test: an array of the groudtruth label
+        
+    Returns:
+        The root mean square error between the prediction and the groudtruth
+    """
+    return np.sqrt(np.mean((y_test - y_pred) ** 2)) 
+
+def _get_model(model_type='linear'):
+    if model_type=="linear":
+        model = lm.LinearRegression()
+
+    return model
+
+def _fit_linear_model_optimal_features(X, y, test_size=.2):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+
+    range_of_num_features = range(1, X_train.shape[1] + 1)
+
+    errors = []
+    for N in range_of_num_features:
+        print(f"Trying first {N} features")
+        model = lm.LinearRegression()
+        
+        # compute the cross validation error
+        error = _compute_CV_error(model, X_train.iloc[:, :N], y_train) 
+        
+        print("\tRMSE:", error)
+        errors.append(error)
+
+    best_num_features = np.argmin(errors) + 1
+    best_err = errors[best_num_features - 1]
+
+    print(f"Best choice, use the first {best_num_features} features")
+
+    # Fit linear model with best features
+    model = lm.LinearRegression()
+    model.fit(X_train.iloc[:, :best_num_features], y_train)
+    train_rmse = _rmse(model.predict(X_train.iloc[:, :best_num_features]), y_train) 
+    test_rmse = _rmse(model.predict(X_test.iloc[:, :best_num_features]), y_test)
+
+    print("Train RMSE", train_rmse)
+    print("KFold Validation RMSE", best_err)
+    print("Test RMSE", test_rmse)
+
+    return best_num_features, train_rmse, best_err, test_rmse
 
 # __all__ = ["save_expression_data", "save_atlas_info", "save_thresholded_data"]

@@ -36,6 +36,8 @@ import plotly.graph_objs as go
 import plotly.figure_factory as ff
 import cufflinks as cf
 
+from itertools import cycle
+
 cf.set_config_file(offline=False, world_readable=True, theme='ggplot')
 
 def plotting_style():
@@ -231,7 +233,7 @@ def png_plot(filename, ax=None):
         fig = plt.figure()
         ax = fig.add_subplot(111)
 
-    ax.imshow(img, aspect='equal') # auto is the other option
+    ax.imshow(img, origin='upper', vmax=abs(img).max(), vmin=-abs(img).max(), aspect='equal')
 
 def _make_colormap(atlas):
     """ Helper function to make a matplotlib colormap. Color info csv file must have been created.
@@ -252,7 +254,7 @@ def _make_colormap(atlas):
         regions = df['region_id']
 
         # if transcriptomic, don't divide by 255
-        if atlas=="MDTB-10-subRegions-transcriptomic":
+        if atlas.find('transcriptomic')>-1:
             colors_rgb = [[np.round(y, 2) for y in x] for x in colors]
         else:
             colors_rgb = [[np.round(y / 255, 2) for y in x] for x in colors]
@@ -342,67 +344,6 @@ def _make_colorbar_donor(ax=None):
     cb3.ax.tick_params(axis='y', which='major', labelsize=30)
 
     plt.savefig(str(Defaults.EXTERNAL_DIR / "atlas_templates" / "atlases_png" / f"{cmap_name}-colorbar.png"), bbox_inches='tight')
-
-def save_colors_transcriptomic_atlas():
-    """
-    this function saves colors + labels
-    based on dendrogram clustering for MDTB-10-subRegions
-    not customised for any other atlas
-    """
-
-    df = ana.return_grouped_data(atlas="MDTB-10-subRegions", atlas_other="MDTB-10", remove_outliers=True)
-    labels = Defaults.labels['MDTB-10-subRegions']
-    
-    R = dendrogram_plot(df.T)
-    
-    regex = r"(\d+)-(\w+)"
-
-    # get atlas labels
-    groups = []
-    for p in R['ivl']:
-        match = re.findall(regex, p)[0]
-        groups.append(match)
-
-    # get indices for labels
-    index = []
-    for group in groups:
-        if group[1]=='A':
-            index.append(int(group[0]))
-        else:
-            index.append(int(group[0]) + 10)
-
-    # zero index the regions
-    index = [i-1 for i in index] # zero index
-
-    # figure out which regions are missing
-    res = [ele for ele in range(max(index)+1) if ele not in index]
-
-    # assign colors to clusters
-    colors = sns.color_palette("coolwarm", len(index))
-    # convert to list
-    colors = [list(ele) for ele in colors]
-
-    # append NaN color values to missing regions
-    for ele in res:
-        colors.append(np.tile(float("NaN"),3).tolist())
-
-    # put the rgb colors in sorted order
-    colors_dendrogram = [x[1] for x in sorted(zip(index+res, colors), key=lambda x: x[0])]
-
-    color_r = []
-    color_g = []
-    color_b = []
-    for i in np.arange(len(colors_dendrogram)):
-        color_r.append(np.round(colors_dendrogram[i][0],2))
-        color_g.append(np.round(colors_dendrogram[i][1],2))
-        color_b.append(np.round(colors_dendrogram[i][2],2))
-
-    data = {'region_num':list(range(1,len(labels)+1)), 'region_id': labels, 'r': color_r, 'g':color_g, 'b':color_b}
-
-    # create dataframe
-    df_new = pd.DataFrame(data) 
-
-    df_new.to_csv(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", "MDTB-10-subRegions-transcriptomic-info.csv"))
 
 def interactive_cortex(atlas, info_file=True, mesh='very_inflated', hemisphere="L"):
     """ Plots an interactive cortical surface map. Options for mesh and map can be found in 
@@ -864,6 +805,8 @@ def pcs_loading_plot(dataframe, num_pcs=2, ax=None, **kwargs):
 
         # print(f'Positive Loading on pc {num_pcs+1}: {dataframe.columns[vt[num_pcs, :]>0].to_list()}')
         # print(f'Negative Loading on pc {num_pcs+1}: {dataframe.columns[vt[num_pcs, :]<0].to_list()}')
+        
+        variance_explained(dataframe)
 
 def scree_plot(dataframe, ax=None, **kwargs):
     """ Plots scree plot for n pcs
@@ -935,7 +878,7 @@ def dendrogram_plot(dataframe, method='ward', metric='euclidean', reorder=True, 
         Z=linkage(dataframe, method, metric),
         orientation=orientation,
         get_leaves=True,
-        color_threshold=30.0,
+        color_threshold=35.0,
         labels=dataframe.index.to_list(),
         distance_sort='ascending',
         above_threshold_color='black', 
@@ -985,7 +928,7 @@ def pairplot(dataframe):
     sns.pairplot(dataframe, kind='reg')
     plt.tick_params(axis='both', which='major', labelsize=20)
 
-def variance_explained(dataframe, num_pcs=2):
+def variance_explained(dataframe, num_pcs=1):
     """ Prints variance explained for n pcs
 
         Args:
@@ -1009,9 +952,10 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
             kwargs (dict): dictionary of additional (optional) kwargs.
             may include any graphical argument relevant to seaborn's heatmap
     """
-    corr_matrix = ana._corr_matrix(dataframe)
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
+
+    corr_matrix = ana._corr_matrix(dataframe)
     
     ax = sns.heatmap(
         corr_matrix, 
@@ -1022,7 +966,7 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
         ax=ax, 
         linewidths=.5,
         cbar=True,
-        **kwargs
+        # **kwargs
     )
     ax.set_xticklabels(
         ax.get_xticklabels(),
@@ -1195,23 +1139,23 @@ def corrplot(corr_matrix, size_scale=500, marker='s'):
         size_scale=size_scale
     )
 
-def confusion_matrix_plot(atlas, dataframe, confusion_type="accuracy", normalize=True, test_size=.2, ax=None):
+def confusion_matrix_plot(atlas, dataframe, classifier='logistic', label_type='multi-class', normalize=True, test_size=.2, ax=None):
     """ This function prints and plots the confusion matrix.
         Args:
+            atlas (str): "SUIT-10" or "MDTB-10-subRegions"
             dataframe: dataframe. should have x_cols, y_col, class_col
             x_cols (list): list of col names for training data
             y_col: col name for labelled data. default is 'region_num'
             class_col: default is 'region_id'
             normalize (bool): normalization can be applied by setting `normalize=True`
     """
-    np.random.seed(47)
-
     if ax is None:
-        plt.figure(num=1, figsize=[25,15])
+        plt.figure(num=1, figsize=[10,10])
 
-    X, Y, classes = ana._get_X_Y(atlas, dataframe)
+    X, y, classes = ana._get_X_y(atlas, dataframe, label_type)
 
-    cm = ana._confusion_matrix(X, Y, confusion_type=confusion_type, test_size=test_size)
+    cm, f1 = ana._confusion_matrix(X, y, classifier, label_type, test_size)
+    print(f'f1 = {f1}')
 
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
@@ -1220,10 +1164,10 @@ def confusion_matrix_plot(atlas, dataframe, confusion_type="accuracy", normalize
         title = 'Confusion matrix, without normalization'
 
     plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
-    plt.colorbar()
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
     plt.yticks(tick_marks, classes)
+    plt.colorbar()
 
     fmt = '.2f' if normalize else 'd'
     thresh = cm.max() / 2.
@@ -1234,34 +1178,109 @@ def confusion_matrix_plot(atlas, dataframe, confusion_type="accuracy", normalize
 
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    # plt.title(title)
 
-def precision_recall_plot(atlas, dataframe, test_size=.2, ax=None):
-    np.random.seed(47)
+def precision_recall_plot(atlas, dataframe, classifier='logistic', label_type='multi-class', test_size=.2, ax=None):
+    """ This function plots precision-recall curves for binary and multi-class classification
+    Args:
+        atlas (str): "SUIT-10" or "MDTB-10-subRegions"
+        dataframe: dataframe. should have x_cols, y_col, class_col
+        x_cols (list): list of col names for training data
+        y_col: col name for labelled data. default is 'region_num'
+        class_col: default is 'region_id'
+        normalize (bool): normalization can be applied by setting `normalize=True`
+    """
+    X, y, classes = ana._get_X_y(atlas, dataframe, label_type)
+
+    _, _, _, y_test = ana._split_train_test(X, y, test_size=test_size)
+
+    precision, recall, average_precision, n_classes, f1 = ana._recall_precision(X, y, classifier, label_type, test_size)
+
+    # setup plot details
+    colors = cycle(['navy', 'turquoise', 'darkorange', 'cornflowerblue', 'teal'])
 
     if ax is None:
-        plt.figure(num=1, figsize=[25,15])
-    
-    X, Y, _ = ana._get_X_Y(atlas, dataframe)
+        plt.figure(num=1, figsize=[10,10])
 
-    _, _, _, y_test = ana._split_train_test(X, Y, test_size=test_size)
+    if label_type=="multi-class":
+        # plt.figure(figsize=(7, 8))
+        f_scores = np.linspace(0.2, 0.8, num=4)
+        lines = []
+        labels = []
+        for f_score in f_scores:
+            x = np.linspace(0.01, 1)
+            y = f_score * x / (2 * x - f_score)
+            l, = plt.plot(x[y >= 0], y[y >= 0], color='gray', alpha=0.2)
+            plt.annotate('f1={0:0.1f}'.format(f_score), xy=(0.9, y[45] + 0.02))
 
-    lr_precision, lr_recall = ana._recall_precision(X, Y, test_size=test_size)
+        lines.append(l)
+        labels.append('iso-f1 curves')
+        l, = plt.plot(recall["micro"], precision["micro"], color='gold', lw=2)
+        lines.append(l)
+        labels.append('micro-average Precision-recall (area = {0:0.2f})'
+                    ''.format(average_precision["micro"]))
 
-    # plot the precision-recall curves
-    no_skill = len(y_test[y_test==1]) / len(y_test)
+        # for i, color in zip(range(n_classes), colors):
+        #     l, = plt.plot(recall[i], precision[i], color=color, lw=2)
+        #     lines.append(l)
+        #     labels.append(f'Precision-recall for class {classes[i]} (area = {average_precision[i]})')
 
-    plt.plot([0, 1], [no_skill, no_skill], linestyle='--', label='No Skill')
-    plt.plot(lr_recall, lr_precision, marker='.', label='Logistic')
-    
-    # axis labels
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    
-    # show the legend
-    plt.legend()
-    # show the plot
-    plt.show()
+        plt.legend(lines, labels, loc=(0, .5), prop=dict(size=14)) # bbox_to_anchor=(1, 0.5)
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+
+        print(f'Precision-recall (area = {average_precision["micro"]}')
+        print(f'f1 = {f1}')
+
+    elif label_type=="binary":
+        # plot the precision-recall curves
+        no_skill = len(y_test[y_test==1]) / len(y_test)
+
+        plt.plot([0, 1], [no_skill, no_skill], linestyle='--', label='No Skill')
+        plt.plot(recall, precision, marker='.', label='Classifier')
+        # axis labels
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        # show the legend
+        plt.legend()
+        print(f'Precision-recall (area = {average_precision})')
+        print(f'f1 = {f1}')
+
+    else:
+        print('label type does not exist. options are binary or multi-class')
+
+    # summarize scores
+     
+def residual_error_plot():
+    plt.scatter(np.arange(len(X_test)), Y_test - model.predict(X_test.iloc[:, :best_num_features]))
+    plt.xlabel('x')
+    plt.ylabel('residual (true y - estimated y)')
+    plt.title('Residual vs x for Linear Model')
+    plt.axhline(y = 0, color='r');
+
+def test_train_error_plot(atlas, dataframe, model_type='linear', label_type='multi-class', test_size=.2, ax=None):
+    X, y, _ = ana._get_X_y(atlas, dataframe, label_type=label_type)
+
+    model = ana._get_model(model_type=model_type)
+
+    test_error_vs_N, train_error_vs_N, range_of_num_features = ana._compute_test_train_error(model, X, y, test_size=test_size)
+
+    best_num_features, train_rmse, best_err, test_rmse = ana._fit_linear_model_optimal_features(X, y, test_size=test_size)
+
+    miny = np.min(train_error_vs_N)
+    maxy = np.max(test_error_vs_N)
+
+    plt.plot(range_of_num_features, train_error_vs_N)
+    plt.plot(range_of_num_features, test_error_vs_N)
+    plt.vlines(best_num_features, miny, maxy, colors='k', linestyles='dashed')
+    plt.legend(["training error", "test error", "best # of features"], loc='best', fontsize=11)
+    plt.xlabel("number of features")
+    plt.ylabel("RMSE")
+
+    print("Train RMSE", train_rmse)
+    print("KFold Validation RMSE", best_err)
+    print("Test RMSE", test_rmse)
 
 def _color_list():
     """ Helper function, returns rgb colorlist. Doesn't take args.

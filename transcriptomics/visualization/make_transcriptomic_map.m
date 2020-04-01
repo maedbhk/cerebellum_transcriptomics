@@ -2,6 +2,9 @@
 % colors are given by the leaves of the dendrogram for 
 % this same parcellation
 
+addpath(genpath('/Users/maedbhking/Documents/cerebellum_transcriptomics'))
+addpath(genpath('/Users/maedbhking/Documents/MATLAB'))
+
 atlas_dir = '/Users/maedbhking/Documents/cerebellum_transcriptomics/data/external/atlas_templates';
 cd(atlas_dir)
 

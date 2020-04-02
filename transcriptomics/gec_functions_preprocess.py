@@ -8,6 +8,7 @@ import re
 import glob
 from collections import namedtuple
 import seaborn as sns
+from matplotlib import pyplot as plt
 
 import abagen # library for preprocessing AHBA data
 from sklearn.utils import Bunch
@@ -17,6 +18,7 @@ import pandas as pd
 import numpy as np
 
 from transcriptomics.constants import Defaults
+from transcriptomics import gec_functions_ana as ana 
 
 ATLAS_TEMPLATE_DIR = Defaults.EXTERNAL_DIR / "atlas_templates"
 
@@ -196,6 +198,52 @@ def save_mni_coords():
         df_all = pd.concat([df_all, df])
 
     df_all.to_csv(Defaults.RAW_DATA_DIR / "mni_coords_all_donors.csv") 
+
+def remove_distance_effects(atlas):
+    """ Corrects for distance-dependent correlation effects in coexpression
+    """
+
+    dataframe = ana.return_grouped_data(atlas=atlas, which_genes='top', percentile=1, atlas_other='MDTB-10', remove_outliers=True, normalize=True)
+
+    # corr_matrix = ana._corr_matrix(dataframe)
+    corr_matrix = np.corrcoef(dataframe.T)
+
+    labels = dataframe.columns
+
+    atlas_obj = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}.nii'))
+
+    corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj)
+
+    for i, cm in enumerate([corr_matrix, corr_matrix_residualized]):
+
+        titles = [f'corr matrix for {atlas}', f'corr matrix residualized for {atlas}']
+
+        plt.figure(num=2, figsize=[20,8])
+        ax = sns.heatmap(
+        cm, 
+        vmin=-1, vmax=1, center=0,
+        # cmap=sns.cubehelix_palette(8),
+        cmap=sns.diverging_palette(220, 20, sep=20, as_cmap=True),
+        square=True, 
+        ax=None, 
+        linewidths=.5,
+        cbar=True,
+        # **kwargs
+        )
+        ax.set_xticklabels(
+        labels,
+        rotation=45,
+        horizontalalignment='right'
+        )
+        ax.set_yticklabels(
+        labels,
+        rotation=360,
+        horizontalalignment='right'
+        )
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        plt.title(titles[i])
+        plt.show()
 
 def _get_atlas_info(atlas):
     """ This function makes an info csv file that includes region_num, region_id and region_color.

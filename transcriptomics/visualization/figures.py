@@ -109,7 +109,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     ax2 = fig.add_subplot(gs[1, 0])
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
     df = df.set_index(df.index)
-    visualize.dendrogram_plot(df.T, orientation='top', color_leaves=False, ax=ax2)
+    visualize.dendrogram_plot(df.T, orientation='top', color_leaves=True, ax=ax2)
     ax2.tick_params(axis='x', which='major', labelsize=13)
     ax2.tick_params(axis='y', which='major', labelsize=15)
     # ax2.axis('off')

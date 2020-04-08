@@ -91,8 +91,8 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     
     plotting_style()
     
-    fig = plt.figure(figsize=(20, 15))
-    gs = GridSpec(2, 3, figure=fig)
+    fig = plt.figure(figsize=(20, 25))
+    gs = GridSpec(3, 3, figure=fig)
 
     x_pos = -0.2
     y_pos = 1.02
@@ -106,7 +106,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     ax1.yaxis.label.set_size(30)
 
     # 2b
-    ax2 = fig.add_subplot(gs[1, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
     df = df.set_index(df.index)
     visualize.dendrogram_plot(df.T, orientation='top', color_leaves=True, ax=ax2)
@@ -119,7 +119,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
 
     # 2c
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers, normalize=normalize)
-    ax3 = fig.add_subplot(gs[1, 1])
+    ax3 = fig.add_subplot(gs[0, 2])
     visualize.simple_corr_heatmap(df, ax=ax3)
     ax3.tick_params(axis='x', which='major', labelsize=15)
     ax3.tick_params(axis='y', which='major', labelsize=15)
@@ -128,14 +128,14 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     ax3.yaxis.label.set_size(30)
 
    # 2d
-    ax4 = fig.add_subplot(gs[0, 1:3])
+    ax4 = fig.add_subplot(gs[1, 0:2])
     visualize.png_plot(filename="Yeo-Buckner-7-v2", ax=ax4)
     ax4.axis('off')
     ax4.text(x_pos+.15, y_pos+.4, 'D', transform=ax4.transAxes, fontsize=50,
     verticalalignment='top')
     ax4.yaxis.label.set_size(30)
 
-    # 2f
+    # 2e
     df = ana.return_concatenated_data(atlas_cerebellum="Buckner-7", atlas_cortex="Yeo-7", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize)
     ax5 = fig.add_subplot(gs[1, 2])
     visualize.simple_corr_heatmap(df, ax=ax5)
@@ -144,6 +144,24 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     ax5.text(x_pos-.16, y_pos, 'E', transform=ax5.transAxes, fontsize=50,
     verticalalignment='top')
     ax5.yaxis.label.set_size(30)
+
+    # 2f
+    ax6 = fig.add_subplot(gs[2, 0:2])
+    visualize.png_plot(filename="Yeo-Buckner-17-v2", ax=ax6)
+    ax6.axis('off')
+    ax6.text(x_pos+.15, y_pos+.4, 'F', transform=ax6.transAxes, fontsize=50,
+    verticalalignment='top')
+    ax6.yaxis.label.set_size(30)
+
+    # 2g
+    df = ana.return_concatenated_data(atlas_cerebellum="Buckner-17", atlas_cortex="Yeo-17", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize)
+    ax7 = fig.add_subplot(gs[2, 2])
+    visualize.simple_corr_heatmap(df, ax=ax7)
+    ax7.tick_params(axis='x', which='major', labelsize=20)
+    ax7.tick_params(axis='y', which='major', labelsize=20)
+    ax7.text(x_pos-.16, y_pos, 'G', transform=ax7.transAxes, fontsize=50,
+    verticalalignment='top')
+    ax7.yaxis.label.set_size(30)
 
     plt.subplots_adjust(left=0.02, bottom=0.001, right=2.0, top=1.0, wspace=.2, hspace=.3)
 

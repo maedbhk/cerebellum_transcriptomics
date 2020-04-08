@@ -949,14 +949,27 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
         Args:
             dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
             ax (bool): figure axes. Default is None
-            kwargs (dict): dictionary of additional (optional) kwargs.
-            may include any graphical argument relevant to seaborn's heatmap
+
+        Kwargs (dict): dictionary of additional (optional) kwargs.
+                may include any graphical argument relevant to seaborn's heatmap
+                distance_correct (bool): correct for spatial autocorrelation between regions
+                atlas (str): necessary to give atlas name if you're getting `distance_correct` matrix
+                simple_labels (bool): make simpler labels for figures (i.e. remove first part of prefix "Buckner" or "Yeo")
+        Returns: 
+            heatmap visualization
     """
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
 
-    corr_matrix = ana._corr_matrix(dataframe)
-    
+    if kwargs.get("distance_correct"):
+        if kwargs.get("atlas"):
+            atlas = kwargs["atlas"]
+        else:
+            print('you must give an atlas name as kwarg to return residualized matrix')
+        corr_matrix, labels = ana._corr_matrix_residualized(dataframe, atlas)
+    else:
+        corr_matrix, labels = ana._corr_matrix(dataframe)
+
     ax = sns.heatmap(
         corr_matrix, 
         vmin=-1, vmax=1, center=0,
@@ -968,14 +981,27 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
         cbar=True,
         # **kwargs
     )
+    # figure out labels
+    if kwargs.get("simple_labels"):
+        regex = r'-(.*)' # get everything after the '-'
+        labels_heat = []
+        for label in labels:
+            labels_heat.append(re.findall(regex, label)[0])
+    else:
+        labels_heat = labels
+
     ax.set_xticklabels(
-        ax.get_xticklabels(),
+        labels_heat,
         rotation=45,
+        horizontalalignment='right'
+        )
+    ax.set_yticklabels(
+        labels_heat,
+        rotation=360,
         horizontalalignment='right'
     )
     ax.set_xlabel('')
     ax.set_ylabel('')
-    # ax.title('Correlation Matrix', fontsize=20)
 
 def raster_plot(dataframe, ax=None, gene_reorder=True, cbar=True, **kwargs):
     """ Plots raster plot, rows are genes and columns are rois

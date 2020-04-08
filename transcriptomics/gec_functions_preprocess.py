@@ -245,6 +245,22 @@ def remove_distance_effects(atlas):
         plt.title(titles[i])
         plt.show()
 
+def make_new_atlas(atlas_cortex="Yeo-7", atlas_cerebellum="Buckner-7"):
+    # load in cortical atlas
+    img_cortex = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cortex}.nii'), mmap=False)
+
+    # load in cerebellar atlas
+    img_cerebellum = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cerebellum}.nii'), mmap=False)
+
+    keyboard
+
+    out_name = os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cortex}-{atlas_cerebellum}.nii')
+    nib.save(img_new, out_name)
+
+    ni2_funcs = (nib.Nifti2Image.from_image(nib.load(func)) for func in all_func)
+    ni2_concat = nib.concat_images(ni2_funcs, check_affines=False, axis=3)
+    ni2_concat.to_filename(outfile)
+
 def _get_atlas_info(atlas):
     """ This function makes an info csv file that includes region_num, region_id and region_color.
 

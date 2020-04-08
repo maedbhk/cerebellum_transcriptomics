@@ -1,6 +1,7 @@
 import re
 import os
 from collections import namedtuple
+import itertools
 
 import numpy as np
 import scipy as sp
@@ -11,7 +12,9 @@ from matplotlib import cm
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-import itertools
+import abagen # library for preprocessing AHBA data
+
+import nibabel as nib
 
 from sklearn.model_selection import train_test_split
 import sklearn.linear_model as lm
@@ -471,7 +474,25 @@ def _corr_matrix(dataframe):
     Args:
         dataframe: given by return_grouped_data
     """
-    return dataframe.corr()
+
+    corr_matrix = dataframe.corr()
+    labels = dataframe.columns
+
+    return corr_matrix, labels
+
+def _corr_matrix_residualized(dataframe, atlas):
+    """ returns a residualized correlation matrix. removes spatial autocorr between regions
+        Args: 
+            dataframe: (pandas dataframe)
+            atlas (str): atlas name
+        Returns residualized correlation matrix + labels
+    """
+    corr_matrix = np.corrcoef(dataframe.T)
+    labels = dataframe.columns
+    atlas_obj = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}.nii'))
+    corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj)
+
+    return corr_matrix_residualized, labels
 
 def _compute_k_means_n_dims(dataframe, num_clusters):
     """This function returns results of n-dimensional k-means.

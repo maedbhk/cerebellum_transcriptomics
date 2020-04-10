@@ -120,7 +120,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     # 2c
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers, normalize=normalize)
     ax3 = fig.add_subplot(gs[0, 2])
-    visualize.simple_corr_heatmap(df, ax=ax3)
+    visualize.simple_corr_heatmap(df, atlas=atlas, distance_correct=True, ax=ax3)
     ax3.tick_params(axis='x', which='major', labelsize=15)
     ax3.tick_params(axis='y', which='major', labelsize=15)
     ax3.text(x_pos-.03, y_pos, 'C', transform=ax3.transAxes, fontsize=50,
@@ -137,8 +137,9 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
 
     # 2e
     df = ana.return_concatenated_data(atlas_cerebellum="Buckner-7", atlas_cortex="Yeo-7", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize)
+    # df = ana.return_grouped_data(atlas="Yeo-Buckner-7", percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers, normalize=normalize)
     ax5 = fig.add_subplot(gs[1, 2])
-    visualize.simple_corr_heatmap(df, ax=ax5)
+    visualize.simple_corr_heatmap(df, atlas="Yeo-Buckner-7", distance_correct=True, simple_labels=True, ax=ax5)
     ax5.tick_params(axis='x', which='major', labelsize=20)
     ax5.tick_params(axis='y', which='major', labelsize=20)
     ax5.text(x_pos-.16, y_pos, 'E', transform=ax5.transAxes, fontsize=50,
@@ -155,8 +156,9 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
 
     # 2g
     df = ana.return_concatenated_data(atlas_cerebellum="Buckner-17", atlas_cortex="Yeo-17", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize)
+    # df = ana.return_grouped_data(atlas="Yeo-Buckner-17", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers, normalize=normalize)
     ax7 = fig.add_subplot(gs[2, 2])
-    visualize.simple_corr_heatmap(df, ax=ax7)
+    visualize.simple_corr_heatmap(df, atlas="Yeo-Buckner-17", distance_correct=True, simple_labels=True, ax=ax7)
     ax7.tick_params(axis='x', which='major', labelsize=20)
     ax7.tick_params(axis='y', which='major', labelsize=20)
     ax7.text(x_pos-.16, y_pos, 'G', transform=ax7.transAxes, fontsize=50,

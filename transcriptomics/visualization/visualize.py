@@ -983,10 +983,11 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
     )
     # figure out labels
     if kwargs.get("simple_labels"):
-        regex = r'-(.*)' # get everything after the '-'
+        regex = '(.*)-(.*)' # get everything after the second '-'
         labels_heat = []
         for label in labels:
-            labels_heat.append(re.findall(regex, label)[0])
+            # labels_heat.append(re.findall(regex, label)[0])
+            labels_heat.append(re.findall(regex, label)[0][1])
     else:
         labels_heat = labels
 

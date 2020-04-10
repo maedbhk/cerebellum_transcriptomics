@@ -486,10 +486,11 @@ def _corr_matrix_residualized(dataframe, atlas):
             dataframe: (pandas dataframe)
             atlas (str): atlas name
         Returns residualized correlation matrix + labels
-    """
+    """a
     corr_matrix = np.corrcoef(dataframe.T)
     labels = dataframe.columns
     atlas_obj = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}.nii'))
+
     corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj)
 
     return corr_matrix_residualized, labels

@@ -199,67 +199,39 @@ def save_mni_coords():
 
     df_all.to_csv(Defaults.RAW_DATA_DIR / "mni_coords_all_donors.csv") 
 
-def remove_distance_effects(atlas):
-    """ Corrects for distance-dependent correlation effects in coexpression
-    """
+def join_atlases(atlas_cortex="Yeo-7", atlas_cerebellum="Buckner-7", num_regs=7):
+    ATLAS_TEMPLATE_DIR = Defaults.EXTERNAL_DIR / "atlas_templates"
 
-    dataframe = ana.return_grouped_data(atlas=atlas, which_genes='top', percentile=1, atlas_other='MDTB-10', remove_outliers=True, normalize=True)
-
-    # corr_matrix = ana._corr_matrix(dataframe)
-    corr_matrix = np.corrcoef(dataframe.T)
-
-    labels = dataframe.columns
-
-    atlas_obj = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}.nii'))
-
-    corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj)
-
-    for i, cm in enumerate([corr_matrix, corr_matrix_residualized]):
-
-        titles = [f'corr matrix for {atlas}', f'corr matrix residualized for {atlas}']
-
-        plt.figure(num=2, figsize=[20,8])
-        ax = sns.heatmap(
-        cm, 
-        vmin=-1, vmax=1, center=0,
-        # cmap=sns.cubehelix_palette(8),
-        cmap=sns.diverging_palette(220, 20, sep=20, as_cmap=True),
-        square=True, 
-        ax=None, 
-        linewidths=.5,
-        cbar=True,
-        # **kwargs
-        )
-        ax.set_xticklabels(
-        labels,
-        rotation=45,
-        horizontalalignment='right'
-        )
-        ax.set_yticklabels(
-        labels,
-        rotation=360,
-        horizontalalignment='right'
-        )
-        ax.set_xlabel('')
-        ax.set_ylabel('')
-        plt.title(titles[i])
-        plt.show()
-
-def make_new_atlas(atlas_cortex="Yeo-7", atlas_cerebellum="Buckner-7"):
     # load in cortical atlas
     img_cortex = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cortex}.nii'), mmap=False)
 
     # load in cerebellar atlas
     img_cerebellum = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cerebellum}.nii'), mmap=False)
 
-    keyboard
+    # set affine matrix (should be same for cortex and cerebellum atlas)
+    affine = img_cerebellum.affine
 
-    out_name = os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas_cortex}-{atlas_cerebellum}.nii')
-    nib.save(img_new, out_name)
+    # assign new labels to cerebellum so that 
+    # cortex and cerebellar networks have unique labels
+    data_cerebellum = img_cerebellum.get_fdata()
+    data_relabelled = []
+    for x in data_cerebellum.ravel():
+        if x>0:
+            value = x+num_regs
+        else:
+            value = x
+        data_relabelled.append(value)
 
-    ni2_funcs = (nib.Nifti2Image.from_image(nib.load(func)) for func in all_func)
-    ni2_concat = nib.concat_images(ni2_funcs, check_affines=False, axis=3)
-    ni2_concat.to_filename(outfile)
+    # reshape the data so that it is in x,y,z coords
+    data_relabelled = np.array(data_relabelled).reshape(img_cerebellum.shape)
+        
+    # get new data
+    data = data_relabelled + img_cortex.get_fdata()
+    data[data>num_regs*2]=0 
+
+    # save out new image
+    new_image = nib.Nifti1Image(data, affine)
+    nib.save(new_image, os.path.join(ATLAS_TEMPLATE_DIR, f'Yeo-Buckner-{num_regs}.nii'))
 
 def _get_atlas_info(atlas):
     """ This function makes an info csv file that includes region_num, region_id and region_color.

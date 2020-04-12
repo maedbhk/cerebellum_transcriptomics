@@ -31,6 +31,7 @@ from sklearn.metrics import auc
 from sklearn.preprocessing import label_binarize
 
 from transcriptomics.constants import Defaults
+from transcriptomics.gec_functions_preprocess import _threshold_genes_dr
 from transcriptomics.visualization import visualize
 
 GeneSubset = namedtuple("GeneSubset", ["threshold", "goi_idx"])
@@ -52,10 +53,6 @@ def return_grouped_data(atlas, which_genes='top', percentile=1, **kwargs):
                 reorder_labels (bool): certain atlases have labels that need to be reordered for visual presentation (i.e. MDTB-10-subRegions)
                 unthresholded (bool): returns grouped data for unthresholded data.
     """
-    # option to get genes from another atlas
-    # if kwargs.get("atlas_other"):
-    #     dataframe = _threshold_data(atlas=atlas, which_genes=which_genes, percentile=percentile, **kwargs) #  kwargs["atlas_other"]
-    
     # option to get thresholded or unthresholded data
     if kwargs.get("unthresholded"):
         dataframe = return_unthresholded_data(atlas)
@@ -132,6 +129,9 @@ def return_thresholded_data(atlas, which_genes='top', percentile=1, **kwargs):
 
     if kwargs.get("normalize"):
         dataframe[genes] = _center_scale(dataframe[genes])
+
+    # threshold the data with gene subset
+    dataframe = dataframe[list(genes) + list(dataframe.filter(regex=("[_].*")).columns)]
 
     return dataframe
 
@@ -434,6 +434,23 @@ def _compute_svd(dataframe):
     
     return u, s, vt, pcs
 
+def _variance_explained(dataframe, pcs=1):
+    """ Gets variance explained for n pcs
+
+        Args:
+            dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
+            num_pcs (int): number of pcs to include in variance explained. 
+    """
+    _, s, _, _ = _compute_svd(dataframe)
+
+    var_all = (s**2)/np.sum(s**2)
+
+    # zero index
+    pcs = [x-1 for x in pcs]
+    pcs_var_fraction = np.sum(var_all[pcs])
+
+    return pcs_var_fraction
+
 def _pcs_winner_take_all(dataframe, num_pcs): 
     """This function returns pcs labelled by winner-take-all.
 
@@ -480,18 +497,44 @@ def _corr_matrix(dataframe):
 
     return corr_matrix, labels
 
+def _correct_indices_residualized_matrix(dataframe, atlas):
+    """ get labels for regions included in residualized matrix.
+    this function is necessary for `_corr_matrix_residualized`
+        Args: 
+            dataframe (pandas dataframe)
+            atlas (str): name of atlas
+        Returns:
+            correct indices for labels to keep for residualized matrix
+    """
+    labels = dataframe.columns.to_list()
+
+    atlas_info = os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}-info.csv')
+    if os.path.isfile(atlas_info):
+        df = pd.read_csv(atlas_info)
+        default_labels = df['region_id']
+    else: 
+        default_labels = Defaults.labels[atlas]      
+    
+    _, _, comm2 = np.intersect1d(labels, default_labels, assume_unique=True, return_indices=True)
+    indices = sorted(comm2+1)
+
+    return indices
+
 def _corr_matrix_residualized(dataframe, atlas):
     """ returns a residualized correlation matrix. removes spatial autocorr between regions
         Args: 
             dataframe: (pandas dataframe)
             atlas (str): atlas name
         Returns residualized correlation matrix + labels
-    """a
+    """
     corr_matrix = np.corrcoef(dataframe.T)
     labels = dataframe.columns
     atlas_obj = nib.load(os.path.join(Defaults.EXTERNAL_DIR, "atlas_templates", f'{atlas}.nii'))
 
-    corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj)
+    # figure out which labels from `atlas` are included in coexpression matrix
+    indices = _correct_indices_residualized_matrix(dataframe=dataframe, atlas=atlas)
+
+    corr_matrix_residualized = abagen.correct.remove_distance(coexpression=corr_matrix, atlas=atlas_obj, labels=indices)
 
     return corr_matrix_residualized, labels
 
@@ -513,6 +556,15 @@ def _compute_k_means_n_dims(dataframe, num_clusters):
     
     return df_n_dims
 
+def _corr_gene_selection_methods():
+    genes_ds = _get_gene_symbols(atlas="MDTB-10", which_genes="top", percentile=1)
+     
+    genes_dr = _threshold_genes_dr(atlas="MDTB-10")
+
+    common_genes = set(genes_dr[:157].to_list()).intersection(genes_ds.to_list())
+    percent_overlap = len(common_genes)/len(genes_dr)*100
+    print(f'{percent_overlap}% of genes are common between differential stability and dimensionality reduction gene selection methods')
+    
 def _split_train_test(X, y, test_size):
     """ divides X and y into train and test sets
         Args:
@@ -663,6 +715,7 @@ def _get_X_y(atlas, dataframe, label_type):
         Returns:
             X, y, classes
     """
+    np.random.seed(10)
     # x_cols = _get_gene_symbols(atlas="MDTB-10", which_genes='top', percentile=1)
     x_cols = dataframe.filter(regex=("[A-Z0-9].*")).columns
 
@@ -701,6 +754,7 @@ def _compute_CV_error(model, X, y, test_size=.2):
     Return:
         the average validation MSE for the 4 splits.
     '''
+    np.random.seed(10)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
 
     kf = KFold(n_splits=4)
@@ -722,6 +776,8 @@ def _compute_CV_error(model, X, y, test_size=.2):
     return np.mean(validation_errors)
 
 def _compute_test_train_error(model, X, y, test_size=.2):
+    np.random.seed(10)
+
     train_error_vs_N = []
     test_error_vs_N = []
 
@@ -739,6 +795,7 @@ def _compute_test_train_error(model, X, y, test_size=.2):
         X_test_first_N_features = X_test.iloc[:, :N]
         test_error = _rmse(model.predict(X_test_first_N_features), y_test)    
         test_error_vs_N.append(test_error)
+        print(f'test train error computed for {N} features')
 
     return test_error_vs_N, train_error_vs_N, range_of_num_features
 
@@ -760,6 +817,7 @@ def _get_model(model_type='linear'):
     return model
 
 def _fit_linear_model_optimal_features(X, y, test_size=.2):
+    np.random.seed(10)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
 
     range_of_num_features = range(1, X_train.shape[1] + 1)

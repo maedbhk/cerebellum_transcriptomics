@@ -71,7 +71,7 @@ def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, **kwarg
     """
     ds = preprocess._get_differential_stability(atlas=atlas)
 
-    threshold, gene_symbols = preprocess._get_threshold_goi(ds, which_genes=which_genes, percentile=percentile)
+    threshold, gene_symbols = preprocess._threshold_genes_ds(ds, which_genes=which_genes, percentile=percentile)
 
     # visualise thresholded expression data
     if ax is None:
@@ -825,6 +825,7 @@ def scree_plot(dataframe, ax=None, **kwargs):
     ax.set_xlabel('Principal Components')
     ax.set_ylabel('Variance Explained')
     # ax.set_title('Scree Plot')
+    plt.show()
 
 def _reorder_dendrogram_leaves(dataframe):
     # calculate euclidean distances between regions
@@ -936,10 +937,7 @@ def variance_explained(dataframe, num_pcs=1):
             num_pcs (int): number of pcs to include in variance explained.
             
     """
-    u, s, vt, pcs = ana._compute_svd(dataframe)
-
-    var_all = (s**2)/np.sum(s**2)
-    pcs_var_fraction = np.sum(var_all[:num_pcs])
+    pcs_var_fraction = ana._variance_explained(dataframe, num_pcs=num_pcs)
 
     print(f"The first {num_pcs} pcs account for {np.round(pcs_var_fraction*100,2)}% of the overall variance")
 

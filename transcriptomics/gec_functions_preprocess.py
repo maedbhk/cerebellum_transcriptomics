@@ -143,7 +143,7 @@ def save_thresholded_data(atlas, which_genes='top', percentile=1):
     ds = _get_differential_stability(atlas) # this function assumes that you're providing all 6 donors
 
     # get back thresholded expression data
-    threshold, gene_symbols = _get_threshold_goi(ds, which_genes=which_genes, percentile=percentile) # choose top or bottom 
+    threshold, gene_symbols = _threshold_genes_ds(ds, which_genes=which_genes, percentile=percentile) # choose top or bottom 
     
     # apply threshold to gene expression and get subset
     expression_thresholded = expression_cleaned[list(gene_symbols) + list(expression_cleaned.filter(regex=("[_].*")).columns)]
@@ -305,7 +305,7 @@ def _get_donor_files(donor_id):
     filtered_files = {k: list(filter(regex.findall, v)) for k, v in data_files.items()}
     return Bunch(**filtered_files)
 
-def _get_threshold_goi(ds, which_genes, percentile): 
+def _threshold_genes_ds(ds, which_genes, percentile): 
     """ This function returns thresholded genes based on differential stability analysis.
 
     Args:
@@ -323,6 +323,29 @@ def _get_threshold_goi(ds, which_genes, percentile):
         raise ValueError(f"Invalid percentile: {which_genes}")
 
     return GeneSubset(threshold, ds.index[goi_idx])
+
+def _threshold_genes_dr(atlas="MDTB-10", pcs_subset=[1]):
+    """ This function returns thresholded genes based on dimensionality reduction analysis.
+
+    Args:
+        atlas (str): atlas to threshold. default is `MDTB-10`
+        pcs (list of int): list of pcs to evaluate
+    """
+
+    df = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv')
+    
+    # do dimensionality reduction on the dataframe
+    gene_symbols = df.filter(regex=("[A-Z0-9].*")).columns
+    u, s, vt, all_pcs = ana._compute_svd(df[gene_symbols].T)
+
+    # figure out top genes for PC1 only
+    gene_symbols = all_pcs['pc0'].sort_values(ascending=False).index
+
+    # figure out variance explained for `num_pcs`
+    pcs_var_fraction = ana._variance_explained(df[gene_symbols].T, pcs=pcs_subset)
+    print(f"PC(s) {pcs_subset} account for {np.round(pcs_var_fraction*100,2)}% of the overall variance")
+
+    return gene_symbols
 
 def _get_differential_stability(atlas): # outputs results of differential stability analysis - correlations between genes across donors
     """ This function returns differential stability results. Donors are split into two groups (donors 1-3 and 4-6)

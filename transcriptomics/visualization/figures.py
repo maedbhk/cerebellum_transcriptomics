@@ -91,7 +91,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     
     plotting_style()
     
-    fig = plt.figure(figsize=(20, 25))
+    fig = plt.figure(figsize=(20, 28))
     gs = GridSpec(3, 3, figure=fig)
 
     x_pos = -0.2
@@ -159,7 +159,7 @@ def fig_2(atlas='MDTB-10-subRegions', which_genes='top', percentile=1, remove_ou
     # df = ana.return_grouped_data(atlas="Yeo-Buckner-17", which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, reorder_labels=reorder_labels, remove_outliers=remove_outliers, normalize=normalize)
     ax7 = fig.add_subplot(gs[2, 2])
     visualize.simple_corr_heatmap(df, atlas="Yeo-Buckner-17", distance_correct=True, simple_labels=True, ax=ax7)
-    ax7.tick_params(axis='x', which='major', labelsize=20)
+    ax7.tick_params(axis='x', which='major', labelsize=15)
     ax7.tick_params(axis='y', which='major', labelsize=20)
     ax7.text(x_pos-.16, y_pos, 'G', transform=ax7.transAxes, fontsize=50,
     verticalalignment='top')
@@ -177,11 +177,18 @@ def fig_3(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
     x_pos = -0.2
     y_pos = 1.02
     
-    fig = plt.figure(figsize=(12, 15))
-    gs = GridSpec(7, 6, figure=fig)
+    fig = plt.figure(figsize=(14, 15))
+    gs = GridSpec(7, 8, figure=fig)
+
+    ax1 = fig.add_subplot(gs[:, :2])
+    visualize.png_plot(filename='SUIT-10_v2', ax=ax1)
+    ax1.axis('off')
+    ax1.text(x_pos-0.02, y_pos, 'A', transform=ax1.transAxes, fontsize=10,
+    verticalalignment='top')
+    ax1.yaxis.label.set_size(30)
 
     # 3a
-    ax1 = fig.add_subplot(gs[:, 0])
+    ax1 = fig.add_subplot(gs[:, 2])
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
     df = df.set_index(df.index)
     visualize.dendrogram_plot(df, orientation='left', color_leaves=False, ax=ax1)
@@ -192,26 +199,26 @@ def fig_3(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
     ax1.yaxis.label.set_size(30)
 
     # 3b
-    ax2 = fig.add_subplot(gs[:, 1])
+    ax2 = fig.add_subplot(gs[:, 3])
     df = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
     visualize.raster_plot(df,  ax=ax2)
-    ax2.tick_params(axis='both', which='major', labelsize=20)
+    ax2.tick_params(axis='both', which='major', labelsize=15)
     ax2.text(x_pos, y_pos, 'C', transform=ax2.transAxes, fontsize=40,
     verticalalignment='top')
     ax2.yaxis.label.set_size(30)
 
     # 3c
-    ax3 = fig.add_subplot(gs[0:2, 1:5])
-    visualize.simple_corr_heatmap(df, ax=ax3)
+    ax3 = fig.add_subplot(gs[0:2, 3:7])
+    visualize.simple_corr_heatmap(df, atlas=atlas, distance_correct=True, ax=ax3)
     ax3.tick_params(axis='both', which='major', labelsize=20)
     ax3.text(-0.4, 1.06, 'D', transform=ax3.transAxes, fontsize=40,
     verticalalignment='top')
     ax3.yaxis.label.set_size(30)
 
     # 3d
-    ax4 = fig.add_subplot(gs[3:5, 3:5])
+    ax4 = fig.add_subplot(gs[3:5, 5:7])
     visualize.dendrogram_plot(df.T, ax=ax4, color_leaves=False)
-    ax4.tick_params(axis='x', which='major', labelsize=10)
+    ax4.tick_params(axis='x', which='major', labelsize=8)
     ax4.tick_params(axis='y', which='major', labelsize=20)
     plt.setp(ax4.lines, linewidth=10) # THIS ISN'T WORKING
     ax4.text(-0.28, 1.09, 'E', transform=ax4.transAxes, fontsize=40,
@@ -219,9 +226,9 @@ def fig_3(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
     ax4.yaxis.label.set_size(20)
 
     # 3e
-    ax5 = fig.add_subplot(gs[5:7,3:5])
+    ax5 = fig.add_subplot(gs[5:7,5:7])
     visualize.pcs_loading_plot(df, num_pcs=0, group_pcs=False, atlas=atlas, ax=ax5)
-    ax5.tick_params(axis='x', which='major', labelsize=10)
+    ax5.tick_params(axis='x', which='major', labelsize=8)
     ax5.tick_params(axis='y', which='major', labelsize=20)
     ax5.text(-0.28, 1.04, 'F', transform=ax5.transAxes, fontsize=40,
     verticalalignment='top')
@@ -378,7 +385,7 @@ def supp_3(atlas="SUIT-26", which_genes='top', percentile=1, remove_outliers=Tru
     
     ax1 = fig.add_subplot(gs[0, 0])
     dataframe = ana.return_grouped_data(atlas=atlas, which_genes=which_genes, percentile=percentile, atlas_other=atlas_other, remove_outliers=remove_outliers, normalize=normalize)
-    visualize.simple_corr_heatmap(dataframe, ax=ax1)
+    visualize.simple_corr_heatmap(dataframe, atlas=atlas, distance_correct=True, ax=ax1)
 
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_3"), bbox_inches="tight", dpi=300)
 
@@ -391,7 +398,7 @@ def supp_4(atlas1="MDTB-10-subRegions", atlas2="SUIT-10", which_genes='top', atl
     y_pos = 1.1
     
     # return all samples dataframe
-    df = ana.return_thresholded_data(atlas=atlas1, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize, all_samples=True)
+    df = ana.return_thresholded_data(atlas=atlas1, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=False, normalize=normalize, all_samples=True)
     plt.clf()
     plt.figure()
     visualize.confusion_matrix_plot(atlas1, df, classifier=classifier, label_type="binary") # ax=ax1
@@ -400,7 +407,7 @@ def supp_4(atlas1="MDTB-10-subRegions", atlas2="SUIT-10", which_genes='top', atl
     plt.clf()
 
     # return all samples dataframe
-    df = ana.return_thresholded_data(atlas=atlas2, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize, all_samples=True)
+    df = ana.return_thresholded_data(atlas=atlas2, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=False, normalize=normalize, all_samples=True)
     plt.figure()
     visualize.confusion_matrix_plot(atlas2, df, classifier=classifier, label_type="multi-class") # ax=ax1
     plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_4b"), bbox_inches="tight", dpi=300)
@@ -411,15 +418,22 @@ def supp_4(atlas1="MDTB-10-subRegions", atlas2="SUIT-10", which_genes='top', atl
     # visualize.precision_recall_plot(atlas, df, classifier=classifier, label_type=label_type) #ax=ax2
     # plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_4b"), bbox_inches="tight", dpi=300)
 
-def supp_5(atlas='SUIT-10', which_genes='top', atlas_other="MDTB-10", percentile=1, model_type='linear', label_type='multi-class', remove_outliers=True, normalize=True):
+def supp_5(atlas1='SUIT-10', atlas2='MDTB-10-subRegions', which_genes='top', atlas_other="MDTB-10", percentile=1, model_type='linear', label_type='multi-class', normalize=True):
     plt.clf()
    
     plotting_style()
     
     # return all samples dataframe
-    df = ana.return_thresholded_data(atlas=atlas, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, remove_outliers=remove_outliers, normalize=normalize, all_samples=True)
+    df = ana.return_thresholded_data(atlas1, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, normalize=normalize, all_samples=True)
 
-    visualize.test_train_error_plot(atlas, df)
+    visualize.test_train_error_plot(atlas1, df)
+
+    plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_5a"), bbox_inches="tight", dpi=300)
 
     plt.clf()
-    plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_5"), bbox_inches="tight", dpi=300)
+    # return all samples dataframe
+    df = ana.return_thresholded_data(atlas2, which_genes=which_genes, atlas_other=atlas_other, percentile=percentile, normalize=normalize, all_samples=True)
+
+    visualize.test_train_error_plot(atlas2, df)
+
+    plt.savefig(str(Defaults.PROCESSED_DIR / "figures" / "supp_5b"), bbox_inches="tight", dpi=300)

@@ -31,8 +31,8 @@ from sklearn.metrics import auc
 from sklearn.preprocessing import label_binarize
 
 from transcriptomics.constants import Defaults
-from transcriptomics.gec_functions_preprocess import _threshold_genes_dr
 from transcriptomics.visualization import visualize
+from transcriptomics.gec_functions_preprocess import save_thresholded_data
 
 GeneSubset = namedtuple("GeneSubset", ["threshold", "goi_idx"])
 
@@ -338,8 +338,14 @@ def _get_gene_symbols(atlas, which_genes, percentile):
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1 
     """
+    fpath = Defaults.PROCESSED_DIR / f'expression-alldonors-{atlas}-{which_genes}-{percentile}.csv'
+    
+    # make file if it doensn't exist
+    if not os.path.isfile(fpath):
+        save_thresholded_data(atlas=atlas, which_genes=which_genes, percentile=percentile)
 
-    dataframe = pd.read_csv(Defaults.PROCESSED_DIR / f'expression-alldonors-{atlas}-{which_genes}-{percentile}.csv')
+    # load dataframe
+    dataframe = pd.read_csv(fpath)
 
     # use regex to find gene columns
     gene_symbols = dataframe.filter(regex=("[A-Z0-9].*")).columns
@@ -434,12 +440,12 @@ def _compute_svd(dataframe):
     
     return u, s, vt, pcs
 
-def _variance_explained(dataframe, pcs=1):
+def _variance_explained(dataframe, pcs=[1]):
     """ Gets variance explained for n pcs
 
         Args:
             dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
-            num_pcs (int): number of pcs to include in variance explained. 
+            pcs (list of int): which pc to include in variance explained. 
     """
     _, s, _, _ = _compute_svd(dataframe)
 
@@ -563,8 +569,41 @@ def _corr_gene_selection_methods():
 
     common_genes = set(genes_dr[:157].to_list()).intersection(genes_ds.to_list())
     percent_overlap = len(common_genes)/len(genes_dr)*100
+
     print(f'{percent_overlap}% of genes are common between differential stability and dimensionality reduction gene selection methods')
     
+def _threshold_genes_dr(atlas="MDTB-10", pcs_subset=[1], group=True):
+    """ This function returns thresholded genes based on dimensionality reduction analysis.
+
+    Args:
+        atlas (str): atlas to threshold. default is `MDTB-10`
+        pcs (list of int): list of pcs to evaluate
+        group (bool): group donor data. default is True. 
+    """
+
+    df = pd.read_csv(Defaults.INTERIM_DIR / f'expression-alldonors-{atlas}-cleaned.csv')
+
+    if group:
+        # group by region first?
+        df = _group_by_region(df)
+
+    # normalize the data before dimensionality reduction
+    df = _center_scale(df)
+
+    # do dimensionality reduction on the dataframe
+    gene_symbols = df.filter(regex=("[A-Z0-9].*")).columns
+    u, s, vt, all_pcs = _compute_svd(df[gene_symbols].T)
+
+    # figure out top genes for PC1 only
+    # gene_symbols = all_pcs['pc0'].sort_values(ascending=False)
+    gene_symbols = all_pcs['pc0']
+
+    # figure out variance explained for `num_pcs`
+    pcs_var_fraction = _variance_explained(df[gene_symbols.index].T, pcs=pcs_subset)
+    print(f"PC(s) {pcs_subset} account for {np.round(pcs_var_fraction*100,2)}% of the overall variance")
+
+    return gene_symbols
+
 def _split_train_test(X, y, test_size):
     """ divides X and y into train and test sets
         Args:

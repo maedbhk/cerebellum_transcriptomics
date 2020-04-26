@@ -56,7 +56,7 @@ def plotting_style():
     plt.rcParams["font.weight"] = "regular"
     plt.rcParams["savefig.format"] = 'png'
 
-def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, **kwargs): 
+def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, method='ds', **kwargs): 
     """This function plots the results of the differential stability analysis. 
     Main purpose of this graph is to demonstrate that only a small subset of genes 
     are taken to be used by further analyses. The top 1% of the most stable genes (across donor groups)
@@ -66,21 +66,67 @@ def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, **kwarg
         which_genes (str): 'top' or 'bottom' % of genes to threshold
         percentile (int): any % of changes to threshold. Default is 1 
         ax (bool): figure axes. Default is None
+        method (str): `ds` or `dr`. different ways of selecting genes. (`ds`=differnetial stability and `dr`=dimensionality reduction)
         kwargs (dict): dictionary of additional (optional) kwargs.
             may include any graphical argument relevant to seaborn "distplot"
     """
+    # genes from differential stability
     ds = preprocess._get_differential_stability(atlas=atlas)
 
-    threshold, gene_symbols = preprocess._threshold_genes_ds(ds, which_genes=which_genes, percentile=percentile)
+    # threshold, _ = preprocess._threshold_genes_ds(genes_ds, which_genes=which_genes, percentile=percentile)
+    # genes from dimensionality reduction
+    dr = ana._threshold_genes_dr(atlas=atlas)
+
+    if method=="ds":
+        all_genes = ds
+        gene_subset_n = np.round(len(all_genes)*(percentile/100)).astype(int)
+        top_genes = dr.sort_values(ascending=False)[:gene_subset_n] #determine number of genes corresponding to `percentile`
+        xlabel = 'Correlation (R)'
+        title = 'Gene selection (differential stability)'
+    elif method=="dr":
+        all_genes = dr
+        gene_subset_n = np.round(len(all_genes)*(percentile/100)).astype(int)
+        top_genes = ds.sort_values(ascending=False)[:gene_subset_n]
+        xlabel = 'Dimensionality reduction'
+        title = 'Gene selection (dimensionality reduction)'
+    else: 
+        print(f'{method} does not exist as a method')
+
+    # get threshold for `method`
+    if which_genes == "top":
+        threshold = np.percentile(all_genes, 100 - percentile, interpolation = 'linear')
+    elif which_genes == "bottom":
+        threshold = np.percentile(all_genes, 1 + percentile, interpolation = 'linear')
+
+    # set bin size
+    bins = 500
 
     # visualise thresholded expression data
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
-    ax = sns.distplot(ds, bins=100, ax=ax, **kwargs)
-    ax.axvline(x=threshold, color='r', linestyle='--')
+    ax = sns.distplot(all_genes, bins=bins, ax=ax, **kwargs)
+    ax.axvline(x=threshold, color='k', linestyle='--')
     ax.set_ylabel('Gene Count')
-    ax.set_xlabel('Correlation (R)')
-    # plt.title("Differential Stability")
+    ax.set_xlabel(xlabel)
+    ax.set_title(title)
+
+    # highlight genes from other method to demonstrate similarity (if any) 
+    # indices = [all_genes.index.get_loc(i) for i in ['ACP2']]
+    indices = [all_genes.index.get_loc(i) for i in top_genes.index]
+    binlen = len(all_genes) // bins
+    binidx = [idx // binlen for idx in indices]
+    for idx in binidx:
+        idx = idx - 1
+        idx = np.clip(idx, 0, bins-1)
+        ax.patches[idx].set_color('red')
+
+    # find overlap of methods
+    set1 = dr.sort_values(ascending=False)[:gene_subset_n]
+    set2 = ds.sort_values(ascending=False)[:gene_subset_n]
+    common_genes = set(set1.index).intersection(set2.index)
+    print(f'The gene selection methods contain {len(common_genes)/gene_subset_n}% of the same genes')
+
+    return ax, all_genes, top_genes
 
 def _reorder_colors_x_axis(dataframe, cpal):
     """
@@ -764,12 +810,12 @@ def pcs_winner_3D_plot(dataframe, num_pcs=2):
     #Use py.iplot() for IPython notebook
     plotly.offline.iplot(fig, filename='mesh3d_sample')
 
-def pcs_loading_plot(dataframe, num_pcs=2, ax=None, **kwargs):
+def pcs_loading_plot(dataframe, pcs=[1], ax=None, **kwargs):
     """ Plots pcs loading plot for n pcs. 
         
         Args:
             dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
-            num_pcs (int): number of pcs to plot.
+            pcs (list of int): pcs to plot.
             ax (bool): figure axes. Default is None
             kwargs (dict): dictionary of additional (optional) kwargs.
                 group_pcs (bool): plot multiple pcs on graph
@@ -785,22 +831,25 @@ def pcs_loading_plot(dataframe, num_pcs=2, ax=None, **kwargs):
     # gets the correct color for each region (only a problem when there are missing regions)
     labels, cpal_reordered = _reorder_colors_x_axis(dataframe, cpal)
 
-    u, s, vt, pcs = ana._compute_svd(dataframe)
+    u, s, vt, _ = ana._compute_svd(dataframe)
+
+    # zero index the pcs
+    pcs = [x-1 for x in pcs]
 
     if kwargs.get("group_pcs"):
-        for i in np.arange(num_pcs):
+        for pc in pcs:
             if ax is None:
                 plt.figure(num=2, figsize=[20,8])
-            ax = sns.barplot(x=labels, y=vt[i, :], palette=cpal_reordered, alpha=0.7, ax=ax)
+            ax = sns.barplot(x=labels, y=vt[pc, :], palette=cpal_reordered, alpha=0.7, ax=ax)
             # ax.set_xticks(labels) # rotation=90
-            ax.set_ylabel(f'PC{num_pcs+1} Loading')
+            ax.set_ylabel(f'PC{pc+1} Loading')
             ax.set_xlabel('Regions')
     else:
         if ax is None:
             plt.figure(num=2, figsize=[20,8])
-        ax = sns.barplot(x=labels, y=vt[num_pcs, :], palette=cpal_reordered, alpha=0.7, ax=ax)
+        ax = sns.barplot(x=labels, y=vt[pcs[0], :], palette=cpal_reordered, alpha=0.7, ax=ax) # indexs into list
         # ax.set_xticks(labels) # rotation=90
-        ax.set_ylabel(f'PC{num_pcs+1} Loading')
+        ax.set_ylabel(f'PC{pcs[0]+1} Loading')
         ax.set_xlabel('')
 
         # print(f'Positive Loading on pc {num_pcs+1}: {dataframe.columns[vt[num_pcs, :]>0].to_list()}')
@@ -929,17 +978,17 @@ def pairplot(dataframe):
     sns.pairplot(dataframe, kind='reg')
     plt.tick_params(axis='both', which='major', labelsize=20)
 
-def variance_explained(dataframe, num_pcs=1):
+def variance_explained(dataframe, pcs=[1]):
     """ Prints variance explained for n pcs
 
         Args:
             dataframe: dataframe is output from ana.return_grouped_data or ana.return_thresholded_data
-            num_pcs (int): number of pcs to include in variance explained.
+            pcs (list of int): which pcs should be analyzed
             
     """
-    pcs_var_fraction = ana._variance_explained(dataframe, num_pcs=num_pcs)
+    pcs_var_fraction = ana._variance_explained(dataframe, pcs=pcs)
 
-    print(f"The first {num_pcs} pcs account for {np.round(pcs_var_fraction*100,2)}% of the overall variance")
+    print(f"The first {pcs} pcs account for {np.round(pcs_var_fraction*100,2)}% of the overall variance")
 
 def simple_corr_heatmap(dataframe, ax=None, **kwargs):
     """ Plots simple correlation heatmap.

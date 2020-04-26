@@ -227,7 +227,7 @@ def fig_3(atlas='SUIT-10', which_genes='top', percentile=1, remove_outliers=True
 
     # 3e
     ax5 = fig.add_subplot(gs[5:7,5:7])
-    visualize.pcs_loading_plot(df, num_pcs=0, group_pcs=False, atlas=atlas, ax=ax5)
+    visualize.pcs_loading_plot(df, pcs=[1], group_pcs=False, atlas=atlas, ax=ax5)
     ax5.tick_params(axis='x', which='major', labelsize=8)
     ax5.tick_params(axis='y', which='major', labelsize=20)
     ax5.text(-0.28, 1.04, 'F', transform=ax5.transAxes, fontsize=40,
@@ -348,7 +348,7 @@ def supp_2(atlas="SUIT-10", which_genes='top', percentile=1, remove_outliers=Tru
         if i==0:
             ax1.text(x_pos, y_pos, 'A', transform=ax1.transAxes, fontsize=40,
             verticalalignment='top')
-        visualize.pcs_loading_plot(df, num_pcs=0, group_pcs=False, ax=ax1, atlas=atlas)
+        visualize.pcs_loading_plot(df, pcs=[1], group_pcs=False, ax=ax1, atlas=atlas)
         ax1.tick_params(axis='x', which='major', labelsize=10)
         ax1.set_title(str(Defaults.donors[i]))
         ax1.yaxis.label.set_size(20)
@@ -357,7 +357,7 @@ def supp_2(atlas="SUIT-10", which_genes='top', percentile=1, remove_outliers=Tru
         if i==0:
             ax2.text(x_pos, y_pos, 'B', transform=ax2.transAxes, fontsize=40,
             verticalalignment='top')
-        visualize.pcs_loading_plot(df, num_pcs=1, group_pcs=False, ax=ax2, atlas=atlas)
+        visualize.pcs_loading_plot(df, pcs=[2], group_pcs=False, ax=ax2, atlas=atlas)
         ax2.tick_params(axis='x', which='major', labelsize=10)
         ax2.yaxis.label.set_size(20)
 

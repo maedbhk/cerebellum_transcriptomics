@@ -17,13 +17,10 @@ python-snappy= "==0.5.4"
 nibabel= "==2.5.0"
 pandas = "==0.25.0"
 numpy = "==1.17.4"
-experiment-code = {editable = true,path = "."}
-matlab = "*"
-pil = "*"
+transcriptomics = {editable = true,path = "."}
 pillow = "*"
 nilearn = "*"
 plotly = "*"
-cufflink = "*"
 cufflinks = "*"
 
 [requires]

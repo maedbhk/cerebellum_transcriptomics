@@ -742,13 +742,19 @@ def relative_weight_genes(dataframe, pc_num=0):
     ax.set_xlabel('Relative Weight')
     ax.set_title(f"PC{pc_num+1}")
 
-def pcs_table():
+def pcs_table(dataframe, num_pcs=2):
+    pcs_labelled = ana._pcs_winner_take_all(dataframe, num_pcs=num_pcs)
+
+    pcs_labelled = pcs_labelled.reset_index().rename({'index': 'genes'}, axis=1)
+
     # table of genes per region
     region_genes = pcs_labelled.reset_index().groupby('region')['index'].apply(list)
     fig = go.Figure(data=[go.Table(header=dict(values=region_genes.keys().to_list()),
                      cells=dict(values=region_genes.to_list()))
                          ])
     fig.show()
+
+    return pcs_labelled
 
 def pcs_winner_3D_plot(dataframe, num_pcs=2):
     """ Plots 3D plot. Each data point is labelled with "winner" region label.

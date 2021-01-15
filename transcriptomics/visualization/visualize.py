@@ -82,13 +82,13 @@ def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, method=
         gene_subset_n = np.round(len(all_genes)*(percentile/100)).astype(int)
         top_genes = dr.sort_values(ascending=False)[:gene_subset_n] #determine number of genes corresponding to `percentile`
         xlabel = 'Correlation (R)'
-        title = 'Gene selection (differential stability)'
+        # title = 'Gene selection (differential stability)'
     elif method=="dr":
         all_genes = dr
         gene_subset_n = np.round(len(all_genes)*(percentile/100)).astype(int)
         top_genes = ds.sort_values(ascending=False)[:gene_subset_n]
         xlabel = 'Dimensionality reduction'
-        title = 'Gene selection (dimensionality reduction)'
+        # title = 'Gene selection (dimensionality reduction)'
     else: 
         print(f'{method} does not exist as a method')
 
@@ -105,26 +105,26 @@ def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, method=
     if ax is None:
         plt.figure(num=2, figsize=[20,8])
     ax = sns.distplot(all_genes, bins=bins, ax=ax, **kwargs)
-    ax.axvline(x=threshold, color='k', linestyle='--')
+    ax.axvline(x=threshold, color='r', linestyle='--')
     ax.set_ylabel('Gene Count')
     ax.set_xlabel(xlabel)
-    ax.set_title(title)
+    # ax.set_title(title)
 
     # highlight genes from other method to demonstrate similarity (if any) 
     # indices = [all_genes.index.get_loc(i) for i in ['ACP2']]
-    indices = [all_genes.index.get_loc(i) for i in top_genes.index]
-    binlen = len(all_genes) // bins
-    binidx = [idx // binlen for idx in indices]
-    for idx in binidx:
-        idx = idx - 1
-        idx = np.clip(idx, 0, bins-1)
-        ax.patches[idx].set_color('red')
+    # indices = [all_genes.index.get_loc(i) for i in top_genes.index]
+    # binlen = len(all_genes) // bins
+    # binidx = [idx // binlen for idx in indices]
+    # for idx in binidx:
+    #     idx = idx - 1
+    #     idx = np.clip(idx, 0, bins-1)
+    #     ax.patches[idx].set_color('red')
 
     # find overlap of methods
     set1 = dr.sort_values(ascending=False)[:gene_subset_n]
     set2 = ds.sort_values(ascending=False)[:gene_subset_n]
     common_genes = set(set1.index).intersection(set2.index)
-    print(f'The gene selection methods contain {len(common_genes)/gene_subset_n}% of the same genes')
+    # print(f'The gene selection methods contain {len(common_genes)/gene_subset_n}% of the same genes')
 
     return ax, all_genes, top_genes
 
@@ -1030,10 +1030,13 @@ def simple_corr_heatmap(dataframe, ax=None, **kwargs):
         cmap=sns.diverging_palette(220, 20, sep=20, as_cmap=True),
         square=True, 
         ax=ax, 
-        linewidths=.5,
+        linewidths=2.0,
         cbar=True,
         # **kwargs
     )
+    cax = plt.gcf().axes[-1]
+    cax.tick_params(labelsize=30)
+
     # figure out labels
     if kwargs.get("simple_labels"):
         regex = '(.*)-(.*)' # get everything after the second '-'
@@ -1088,6 +1091,8 @@ def raster_plot(dataframe, ax=None, gene_reorder=True, cbar=True, **kwargs):
         cbar_kws={"shrink": 0.8},
         yticklabels=False
     )
+    cax = plt.gcf().axes[-1]
+    cax.tick_params(labelsize=30)
 
     # ax.tick_params(axis=u'both', which=u'both', length=0, bottom=False, top=False, labelbottom=False) 
     ax.set_xlabel('')

@@ -17,10 +17,11 @@ python-snappy= "==0.5.4"
 nibabel= "==2.5.0"
 pandas = "==0.25.0"
 numpy = "==1.17.4"
+matplotlib = "==3.2.0"
 transcriptomics = {editable = true,path = "."}
 pillow = "*"
-nilearn = "*"
-plotly = "*"
+plotly = "==4.13.0"
+nilearn = "==0.7.0"
 cufflinks = "*"
 
 [requires]

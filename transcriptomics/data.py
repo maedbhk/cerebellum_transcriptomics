@@ -15,9 +15,6 @@ import nibabel as nib
 import pandas as pd
 import numpy as np
 
-from SUITPy import flatmap
-from SUITPy import atlas as catlas
-
 from transcriptomics.constants import Defaults
 
 GeneSubset = namedtuple("GeneSubset", ["threshold", "goi_idx"])
@@ -123,7 +120,7 @@ class DataSet:
         if atlas=="Desikan-Killiany-83": # abagen comes with an info for Desikan-Killiany
             pass
 
-        info_dataframe = _get_atlas_info(atlas)
+        info_dataframe = self._get_atlas_info(atlas)
 
         # get output dir
         output_dir = Defaults.EXTERNAL_DIR / "atlas_templates" / f"{atlas}-info.csv"
@@ -145,10 +142,10 @@ class DataSet:
         out_name = f"expression-alldonors-{atlas}-{which_genes}-{percentile}.csv"
 
         # return differential stability results based on two groups (donors 1-3; donors 4-6)
-        ds = _get_differential_stability(atlas) # this function assumes that you're providing all 6 donors
+        ds = self._get_differential_stability(atlas) # this function assumes that you're providing all 6 donors
 
         # get back thresholded expression data
-        threshold, gene_symbols = _threshold_genes_ds(ds, which_genes=which_genes, percentile=percentile) # choose top or bottom 
+        threshold, gene_symbols = self._threshold_genes_ds(ds, which_genes=which_genes, percentile=percentile) # choose top or bottom 
         
         # apply threshold to gene expression and get subset
         expression_thresholded = expression_cleaned[list(gene_symbols) + list(expression_cleaned.filter(regex=("[_].*")).columns)]
@@ -245,7 +242,7 @@ class DataSet:
             need to be resampled.
         """
         # get roi labels for an atlas name
-        labels_roi = _get_roi_labels(atlas)
+        labels_roi = self._get_roi_labels(atlas)
 
         if atlas in list(Defaults.colour_info.keys()):
             # get color info
@@ -304,7 +301,7 @@ class DataSet:
         Args:
             donor_id (str): the donor id to call.
         """
-        data_files = get_all_files()
+        data_files = self.get_all_files()
         regex = re.compile(f"{donor_id}")
         filtered_files = {k: list(filter(regex.findall, v)) for k, v in data_files.items()}
         return Bunch(**filtered_files)

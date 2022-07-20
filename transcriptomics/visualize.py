@@ -7,12 +7,10 @@ import seaborn as sns
 import ast
 import random
 from matplotlib import pyplot as plt
-from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 from matplotlib.colors import LinearSegmentedColormap
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.image as mpimg
 from PIL import Image
 import itertools
@@ -25,8 +23,8 @@ from sklearn.metrics import silhouette_samples, silhouette_score
 from nilearn import plotting, datasets, surface
 
 from transcriptomics import gec_functions_ana as ana
-from transcriptomics import gec_functions_preprocess as preprocess
 from transcriptomics.constants import Defaults
+from transcriptomics.data import DataSet
 
 import plotly
 import plotly.offline as py
@@ -55,6 +53,16 @@ def plotting_style():
     plt.rcParams["axes.labelweight"] = "regular"
     plt.rcParams["font.weight"] = "regular"
     plt.rcParams["savefig.format"] = 'png'
+
+def thresholding_plot(dataframe):
+    """This function plots the results of the thresholding (`differential_stability` or `dimensionality_reduction`) analysis. 
+    Main purpose of this graph is to demonstrate that only a small subset of genes 
+    are taken to be used by further analyses. The top 1% of the most stable genes (across donor groups)
+    as indicated by high R values. 
+    Args:
+        dataframe (pd dataframe):
+    """
+    genes_ordered = dataframe.index.sort_values(ascending=False)
 
 def diff_stability_plot(atlas, which_genes='top', percentile=1, ax=None, method='ds', **kwargs): 
     """This function plots the results of the differential stability analysis. 
@@ -189,8 +197,7 @@ def sample_counts_roi(dataframe, ax=None, **kwargs):
             ax (bool): figure axes. Default is None
             kwargs (dict): dictionary of additional (optional) kwargs.
                 atlas (str): atlas name to color the plot with atlas colors
-                may include any graphical argument relevant to seaborn "violinplot"
-            
+                may include any graphical argument relevant to seaborn "violinplot"  
     """
 
     if kwargs.get("atlas"):
